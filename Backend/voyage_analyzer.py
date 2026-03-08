@@ -254,7 +254,10 @@ def generate_voyage_pdf(analysis_data, ai_plan, output_path):
     pdf.cell(0, 12, "5. CAPTAIN'S STRATEGIC BRIEFING (AI)", 0, 1, 'C', True)
     pdf.ln(5)
     pdf.set_font('times', '', 11)
-    pdf.multi_cell(0, 7, ai_plan)
+    # Sanitize AI text for PDF (replace Unicode chars unsupported by 'times' font)
+    safe_plan = ai_plan.replace('\u2014', '-').replace('\u2013', '-').replace('\u2018', "'").replace('\u2019', "'") \
+                       .replace('\u201c', '"').replace('\u201d', '"').replace('\u2022', '-').replace('\u2026', '...')
+    pdf.multi_cell(0, 7, safe_plan)
     
     # SIGNING BLOCKS
     pdf.ln(20)
