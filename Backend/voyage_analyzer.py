@@ -1,12 +1,10 @@
 import os
-import json
-import logging
 import pandas as pd
+import numpy as np
+import logging
 from fpdf import FPDF
-from openai import OpenAI
 from datetime import datetime
-
-logger = logging.getLogger(__name__)
+import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +74,10 @@ def generate_voyage_pdf(analysis_data, ai_plan, output_path):
     
     # --- PAGE 1: EXECUTIVE SUMMARY ---
     pdf.set_font('helvetica', 'B', 16)
-    pdf.set_text_color(20, 30, 48)
-    pdf.cell(0, 10, '1. VOYAGE EXECUTIVE SUMMARY', 0, 1, 'L')
+    pdf.set_fill_color(240, 240, 240)
+    pdf.cell(0, 12, "1. VOYAGE PERFORMANCE SUMMARY", 0, 1, 'L', True)
+    pdf.ln(5)
+    
     pdf.set_font('helvetica', '', 11)
     
     metrics = analysis_data['summary']
@@ -98,40 +98,33 @@ def generate_voyage_pdf(analysis_data, ai_plan, output_path):
     pdf.cell(col_width, line_h, f" Operational Mode: {analysis_data.get('mode', 'Balanced').title()}", 1, 1, 'L', True)
     pdf.ln(10)
 
-    # 2. WEATHER & SAFETY METRICS
-    pdf.set_font('helvetica', 'B', 16)
-    pdf.cell(0, 10, '2. ENVIRONMENTAL EXPOSURE & SAFETY', 0, 1, 'L')
+    # Economic Benchmarks
+    pdf.set_font('helvetica', 'B', 14)
+    pdf.cell(0, 10, "2. STRATEGIC SAVINGS (Green Corridor Metrics)", 0, 1, 'L')
     pdf.set_font('helvetica', '', 11)
-    
+    pdf.cell(0, 8, f" Fuel Saved vs Baseline: {metrics.get('fuel_tonnes_saved', 0):.1f} MT", 0, 1)
+    pdf.cell(0, 8, f" CO2 Abatement: {metrics.get('co2_tonnes_saved', 0):.1f} MT (Reduced Emissions)", 0, 1)
+    pdf.ln(10)
+
+    # Environmental section
+    pdf.set_font('helvetica', 'B', 14)
+    pdf.cell(0, 10, "3. ENVIRONMENTAL EXPOSURE & SAFETY", 0, 1, 'L')
+    pdf.set_font('helvetica', '', 11)
     w = analysis_data['weather']
-    pdf.cell(col_width, line_h, f" Peak Wave Height: {w.get('max_wave', 0):.2f}m", 1, 0, 'L')
-    pdf.cell(col_width, line_h, f" Significant Wave Dir: {w.get('dominant_wave_dir', 0):.0f} deg", 1, 1, 'L')
+    pdf.cell(0, 8, f" Max Wave Height: {w['max_wave']:.2f}m | Avg: {w['avg_wave']:.2f}m", 0, 1)
+    pdf.cell(0, 8, f" Max Wind Speed: {w['max_wind']:.1f} km/h (Beaufort Force Integration)", 0, 1)
+    pdf.cell(0, 8, f" Significant Wave Direction: {w['dominant_wave_dir']:.1f} deg", 0, 1)
+    pdf.cell(0, 8, f" Route Severity Grade: {w['avg_severity']:.1f}% (Dynamic Stress Index)", 0, 1)
     
-    pdf.cell(col_width, line_h, f" Peak Wind Speed: {w.get('max_wind', 0):.1f} km/h", 1, 0, 'L', True)
-    pdf.cell(col_width, line_h, f" Global Severity Index: {w.get('avg_severity', 0):.1f} / 100", 1, 1, 'L', True)
-    pdf.ln(10)
-
-    # 3. ECONOMIC BENCHMARKS
-    pdf.set_font('helvetica', 'B', 16)
-    pdf.cell(0, 10, '3. STRATEGIC SAVINGS (Vs. A* BASELINE)', 0, 1, 'L')
-    pdf.set_font('helvetica', '', 10)
-    
-    pdf.set_text_color(0, 128, 0) # Green for savings
-    pdf.multi_cell(0, 8, 
-        f"This optimized route achieves a gain of {metrics.get('fuel_tonnes_saved', 0):.2f} MT of fuel "
-        f"compared to the standard baseline route. This results in a reduction of "
-        f"{metrics.get('co2_tonnes_saved', 0):.2f} MT of CO2 emissions. "
-        f"Time variance: {metrics.get('eta_hours_saved', 0):.1f} hours variance recorded."
-    )
-    pdf.set_text_color(0, 0, 0)
-    pdf.ln(10)
-
-    # --- PAGE 2: WAYPOINT ANALYSIS ---
+    # --- PAGE 2: WAYPOINT LOG ---
     pdf.add_page()
     pdf.set_font('helvetica', 'B', 16)
-    pdf.cell(0, 10, '4. WAYPOINT ANALYSIS LOG (SAMPLED)', 0, 1, 'L')
+    pdf.set_fill_color(240, 240, 240)
+    pdf.cell(0, 12, "4. WAYPOINT ANALYSIS LOG", 0, 1, 'C', True)
+    pdf.ln(5)
+    
     pdf.set_font('helvetica', 'B', 9)
-    pdf.set_fill_color(30, 45, 75)
+    pdf.set_fill_color(20, 30, 48)
     pdf.set_text_color(255, 255, 255)
     
     # Table Header
@@ -215,11 +208,10 @@ def analyze_voyage_with_llm(excel_path):
             'current': {'max': df['Current Velocity (m/s)'].max()},
             'severity': {'max': df['Severity Score (0-100)'].max(), 'avg': df['Severity Score (0-100)'].mean()},
             'visibility': {'min': df['Visibility (m)'].min()},
-            'points': len(df),
-            'request_id': os.getenv('X_CLIENT_ID', 'internal-voyage') # Passed via env or direct if possible
+            'points': len(df)
         }
         
-        # Pull request_id from metadata if run_full_analysis passed it (via summary_stats hack or env)
+        # Pull request_id from env
         request_id = os.getenv('VOYAGE_REQUEST_ID', 'unknown-req')
 
         prompt = f"""
@@ -247,15 +239,9 @@ def analyze_voyage_with_llm(excel_path):
         Tone: Professional, authoritative, maritime-standard. Use "Master" to address the reader.
         """
 
-        client = OpenAI(
-            api_key=os.getenv('OPENAI_API_KEY', 'dummy_key'),
-            base_url=os.getenv('OPENAI_API_BASE', 'https://api.openai.com/v1'),
-            organization=os.getenv('OPENAI_ORG_ID'),
-            project=os.getenv('OPENAI_PROJECT_ID')
-        )
-        
-        if os.getenv('OPENAI_API_KEY') == 'your_openai_api_key_here' or not os.getenv('OPENAI_API_KEY'):
-            return "NOTICE TO MASTER: AI Strategic Intelligence is currently in DEMO MODE.\n\n" + \
+        gemini_api_key = os.getenv('GEMINI_API_KEY')
+        if not gemini_api_key or gemini_api_key == 'your_gemini_api_key_here':
+            return "NOTICE TO MASTER: AI Strategic Intelligence is currently in DEMO MODE (Gemini API Key missing).\n\n" + \
                    "SUMMARY ASSESSMENT:\n" + \
                    f"The proposed route encounters peak wave heights of {summary_stats['wave_height']['max']:.2f}m, " + \
                    "which is within standard operating parameters but requires diligent watchkeeping. " + \
@@ -263,18 +249,19 @@ def analyze_voyage_with_llm(excel_path):
                    "Master is advised to maintain current sea-margins and monitor hull vibration if proceeding at standard service speed. " + \
                    "Further fuel optimization is possible by leveraging the favorable current windows identified in the passage plan."
 
-        # Production-grade request with traceability headers
-        response = client.chat.completions.with_raw_response.create(
-            model=os.getenv('OPENAI_MODEL', 'gpt-4'),
-            messages=[{"role": "user", "content": prompt}],
-            extra_headers={"X-Client-Request-Id": request_id}
-        )
+        genai.configure(api_key=gemini_api_key)
+        model_name = os.getenv('GEMINI_MODEL', 'gemini-1.5-pro')
+        model = genai.GenerativeModel(model_name)
         
-        completion = response.parse()
-        openai_req_id = response.headers.get('x-request-id')
-        logger.info(f"OpenAI Trace: client_id={request_id} openai_req_id={openai_req_id} status=success")
+        logger.info(f"Gemini Request: model={model_name} client_id={request_id}")
+        response = model.generate_content(prompt)
         
-        return completion.choices[0].message.content
+        if response.text:
+            logger.info(f"Gemini Trace: client_id={request_id} status=success")
+            return response.text
+        else:
+            raise Exception("Gemini returned empty response")
+
     except Exception as e:
         logger.error(f"AI Analysis failed. Error: {e}")
         return f"Strategic analysis unavailable due to technical error: {str(e)}"
