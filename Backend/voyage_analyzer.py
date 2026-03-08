@@ -117,11 +117,14 @@ def analyze_voyage_with_llm(excel_path):
         )
         return response.choices[0].message.content
     except Exception as e:
-        logger.error(f"AI Analysis failed: {e}")
+        logger.error(f"AI Analysis failed. Columns found: {df.columns.tolist() if 'df' in locals() else 'N/A'}. Error: {e}")
         return f"Strategic analysis unavailable due to technical error: {str(e)}"
 
 def run_full_analysis(excel_path, voyage_metadata, output_pdf):
     logger.info("Starting AI Voyage Analysis...")
+    # Ensure file is flushed to disk
+    import time
+    time.sleep(2) 
     ai_plan = analyze_voyage_with_llm(excel_path)
     
     df = pd.read_excel(excel_path)

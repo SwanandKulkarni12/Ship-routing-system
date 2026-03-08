@@ -1547,6 +1547,8 @@ async def handle_navigation(websocket):
         finally:
             _stop_evt.set()
             await _hb_task
+
+        # Trigger Excel export as soon as weather is ready
         threading.Thread(
             target=export_weather_to_excel, 
             args=(weather_context.get('grid_points', []), weather_context.get('current_weather_lookup', {}), weather_context.get('current_marine_lookup', {})),
@@ -1745,6 +1747,18 @@ async def handle_navigation(websocket):
         _prune_cache_entries(ROUTE_RESPONSE_CACHE, ROUTE_CACHE_MAX_ENTRIES)
         logger.info('request_id=%s sending_response path_points=%s astar_points=%s weather_points=%s alternatives=%s', request_id, len(new_smooth_path), len(new_astar), len(weather_info_list), len(pareto_routes))
         await websocket.send_str(json.dumps(safe_payload, allow_nan=False))
+        
+        # Keep connection alive so background report_ready can be sent
+        try:
+            while not websocket.closed:
+                # Give background task 120s max to finish or until user leaves
+                await asyncio.sleep(2)
+                # Keepalive ping
+                if not websocket.closed:
+                    await websocket.send_str(json.dumps({'type': 'hb'}))
+        except:
+            pass
+            
     except Exception as e:
         logger.exception('request_id=%s handle_navigation error=%s', request_id, e)
         error_payload = sanitize_for_json({'type': 'error', 'message': str(e)})
