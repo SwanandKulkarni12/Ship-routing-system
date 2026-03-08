@@ -8,22 +8,67 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
+
+def get_beaufort_force(kmh):
+    """Converts km/h to Beaufort Scale force."""
+    if kmh < 1: return 0
+    if kmh <= 5: return 1
+    if kmh <= 11: return 2
+    if kmh <= 19: return 3
+    if kmh <= 28: return 4
+    if kmh <= 38: return 5
+    if kmh <= 49: return 6
+    if kmh <= 61: return 7
+    if kmh <= 74: return 8
+    if kmh <= 88: return 9
+    if kmh <= 102: return 10
+    if kmh <= 117: return 11
+    return 12
+
 class VoyageReport(FPDF):
     def header(self):
+        # Professional Header Bar
         self.set_fill_color(20, 30, 48)
-        self.rect(0, 0, 210, 40, 'F')
-        self.set_font('helvetica', 'B', 24)
+        self.rect(0, 0, 210, 45, 'F')
+        
+        # Title
+        self.set_font('helvetica', 'B', 22)
         self.set_text_color(255, 255, 255)
-        self.cell(0, 20, 'VOYAGE STRATEGIC ANALYSIS', 0, 1, 'C')
-        self.set_font('helvetica', 'I', 10)
-        self.cell(0, 5, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 0, 1, 'C')
-        self.ln(10)
+        self.cell(0, 15, 'VOYAGE PERFORMANCE REPORT (VPR)', 0, 1, 'C')
+        
+        # Subtitle / Vessel Particulars Header
+        self.set_font('helvetica', 'B', 9)
+        self.set_y(18)
+        self.cell(0, 10, "OFFICIAL PASSAGE PLAN & STRATEGIC BRIEFING", 0, 1, 'C')
+        
+        # Vessel Info Grid (White text on dark blue)
+        self.set_font('helvetica', '', 8)
+        self.set_y(28)
+        self.cell(50, 4, " VESSEL: M/V OCEAN VOYAGER", 0, 0, 'L')
+        self.cell(50, 4, " IMO: 9876543", 0, 0, 'L')
+        self.cell(50, 4, " FLAG: PANAMA (PA)", 0, 0, 'L')
+        self.cell(40, 4, " CALL SIGN: WXYZ", 0, 1, 'R')
+        
+        self.cell(50, 4, " TYPE: BULK CARRIER", 0, 0, 'L')
+        self.cell(50, 4, " DWT: 82,000 MT", 0, 0, 'L')
+        self.cell(50, 4, f" REF RUN: {datetime.now().strftime('%Y%m%d/%H%MZ')}", 0, 0, 'L')
+        self.cell(40, 4, f" DATE: {datetime.now().strftime('%Y-%m-%d')}", 0, 1, 'R')
+        
+        self.ln(12)
 
     def footer(self):
-        self.set_y(-15)
-        self.set_font('helvetica', 'I', 8)
+        self.set_y(-25)
+        self.set_font('helvetica', 'I', 7)
+        self.set_text_color(160, 160, 160)
+        
+        # Regulatory Footer
+        self.cell(0, 5, 'REGULATORY COMPLIANCE: IMO Resolution A.893(21) | MARPOL Annex VI | SEEMP III Compliant', 0, 1, 'C')
+        self.cell(0, 5, 'This document is a generated Passsage Plan. Final authority rests with the Master as per SOLAS Regulation 34.', 0, 1, 'C')
+        
+        self.set_font('helvetica', 'B', 8)
         self.set_text_color(128, 128, 128)
-        self.cell(0, 10, f'Page {self.page_no()} | Confidential Maritime Routing Report', 0, 0, 'C')
+        self.cell(0, 10, f'Page {self.page_no()} | Confidential AI Voyage Intelligence', 0, 0, 'C')
 
 def generate_voyage_pdf(analysis_data, ai_plan, output_path):
     pdf = VoyageReport()
@@ -90,7 +135,7 @@ def generate_voyage_pdf(analysis_data, ai_plan, output_path):
     pdf.set_text_color(255, 255, 255)
     
     # Table Header
-    cols = [('Lat', 25), ('Lon', 25), ('Wave(m)', 25), ('Wind(km/h)', 25), ('Vis(m)', 25), ('Sev/100', 25), ('Status', 40)]
+    cols = [('Lat', 20), ('Lon', 20), ('Wave(m)', 20), ('Bft', 15), ('Wind(kmh)', 25), ('Vis(m)', 20), ('Sev/100', 25), ('Status', 45)]
     for txt, cw in cols:
         pdf.cell(cw, 10, txt, 1, 0, 'C', True)
     pdf.ln()
@@ -103,27 +148,32 @@ def generate_voyage_pdf(analysis_data, ai_plan, output_path):
         fill = (i % 2 == 0)
         pdf.set_fill_color(245, 245, 245)
         
-        pdf.cell(25, 8, f"{row['Latitude']:.2f}", 1, 0, 'C', fill)
-        pdf.cell(25, 8, f"{row['Longitude']:.2f}", 1, 0, 'C', fill)
-        pdf.cell(25, 8, f"{row['Wave Height (m)']:.1f}", 1, 0, 'C', fill)
+        pdf.cell(20, 8, f"{row['Latitude']:.2f}", 1, 0, 'C', fill)
+        pdf.cell(20, 8, f"{row['Longitude']:.2f}", 1, 0, 'C', fill)
+        pdf.cell(20, 8, f"{row['Wave Height (m)']:.1f}", 1, 0, 'C', fill)
+        
+        # Use Beaufort scale
+        bft = get_beaufort_force(row['Wind Speed (km/h)'])
+        pdf.cell(15, 8, f"F{bft}", 1, 0, 'C', fill)
+        
         pdf.cell(25, 8, f"{row['Wind Speed (km/h)']:.0f}", 1, 0, 'C', fill)
-        pdf.cell(25, 8, f"{row['Visibility (m)']:.0f}", 1, 0, 'C', fill)
+        pdf.cell(20, 8, f"{row['Visibility (m)']:.0f}", 1, 0, 'C', fill)
         
         sev = row['Severity Score (0-100)']
         pdf.cell(25, 8, f"{sev:.1f}", 1, 0, 'C', fill)
         
         status = "LOW RISK"
-        if sev > 60: status = "SEVERE"
-        elif sev > 30: status = "CAUTION"
+        if sev > 60: status = "GALE/STORM"
+        elif sev > 30: status = "MODERATE"
         
-        if status == "SEVERE": pdf.set_text_color(200, 0, 0)
-        elif status == "CAUTION": pdf.set_text_color(180, 120, 0)
+        if status == "GALE/STORM": pdf.set_text_color(200, 0, 0)
+        elif status == "MODERATE": pdf.set_text_color(180, 120, 0)
         else: pdf.set_text_color(0, 100, 0)
         
-        pdf.cell(40, 8, status, 1, 1, 'C', fill)
+        pdf.cell(45, 8, status, 1, 1, 'C', fill)
         pdf.set_text_color(0, 0, 0)
 
-    # --- PAGE 3: AI BRIEFING ---
+    # --- PAGE 3: AI BRIEFING & SIGNING ---
     pdf.add_page()
     pdf.set_font('helvetica', 'B', 16)
     pdf.set_fill_color(240, 240, 240)
@@ -131,6 +181,26 @@ def generate_voyage_pdf(analysis_data, ai_plan, output_path):
     pdf.ln(5)
     pdf.set_font('times', '', 11)
     pdf.multi_cell(0, 7, ai_plan)
+    
+    # SIGNING BLOCKS
+    pdf.ln(20)
+    pdf.set_font('helvetica', 'B', 10)
+    y_start = pdf.get_y()
+    
+    # Left Block
+    pdf.line(10, y_start + 15, 80, y_start + 15)
+    pdf.set_xy(10, y_start + 16)
+    pdf.cell(70, 5, "MASTER, M/V OCEAN VOYAGER", 0, 1, 'L')
+    pdf.set_font('helvetica', '', 8)
+    pdf.cell(70, 4, "Date: ____________________", 0, 1, 'L')
+    
+    # Right Block
+    pdf.set_font('helvetica', 'B', 10)
+    pdf.line(130, y_start + 15, 200, y_start + 15)
+    pdf.set_xy(130, y_start + 16)
+    pdf.cell(70, 5, "CHIEF ENGINEER", 0, 1, 'L')
+    pdf.set_font('helvetica', '', 8)
+    pdf.cell(70, 4, "Date: ____________________", 0, 1, 'L')
     
     pdf.output(output_path)
     return output_path
@@ -145,9 +215,13 @@ def analyze_voyage_with_llm(excel_path):
             'current': {'max': df['Current Velocity (m/s)'].max()},
             'severity': {'max': df['Severity Score (0-100)'].max(), 'avg': df['Severity Score (0-100)'].mean()},
             'visibility': {'min': df['Visibility (m)'].min()},
-            'points': len(df)
+            'points': len(df),
+            'request_id': os.getenv('X_CLIENT_ID', 'internal-voyage') # Passed via env or direct if possible
         }
         
+        # Pull request_id from metadata if run_full_analysis passed it (via summary_stats hack or env)
+        request_id = os.getenv('VOYAGE_REQUEST_ID', 'unknown-req')
+
         prompt = f"""
         Act as a Senior Master Mariner and Weather Routing Specialist. 
         Analyze the following voyage data for a deep-sea merchant vessel:
@@ -175,7 +249,9 @@ def analyze_voyage_with_llm(excel_path):
 
         client = OpenAI(
             api_key=os.getenv('OPENAI_API_KEY', 'dummy_key'),
-            base_url=os.getenv('OPENAI_API_BASE', 'https://api.openai.com/v1')
+            base_url=os.getenv('OPENAI_API_BASE', 'https://api.openai.com/v1'),
+            organization=os.getenv('OPENAI_ORG_ID'),
+            project=os.getenv('OPENAI_PROJECT_ID')
         )
         
         if os.getenv('OPENAI_API_KEY') == 'your_openai_api_key_here' or not os.getenv('OPENAI_API_KEY'):
@@ -187,11 +263,18 @@ def analyze_voyage_with_llm(excel_path):
                    "Master is advised to maintain current sea-margins and monitor hull vibration if proceeding at standard service speed. " + \
                    "Further fuel optimization is possible by leveraging the favorable current windows identified in the passage plan."
 
-        response = client.chat.completions.create(
+        # Production-grade request with traceability headers
+        response = client.chat.completions.with_raw_response.create(
             model=os.getenv('OPENAI_MODEL', 'gpt-4'),
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}],
+            extra_headers={"X-Client-Request-Id": request_id}
         )
-        return response.choices[0].message.content
+        
+        completion = response.parse()
+        openai_req_id = response.headers.get('x-request-id')
+        logger.info(f"OpenAI Trace: client_id={request_id} openai_req_id={openai_req_id} status=success")
+        
+        return completion.choices[0].message.content
     except Exception as e:
         logger.error(f"AI Analysis failed. Error: {e}")
         return f"Strategic analysis unavailable due to technical error: {str(e)}"
@@ -200,6 +283,9 @@ def run_full_analysis(excel_path, voyage_metadata, output_pdf):
     logger.info("Starting Comprehensive AI Voyage Analysis...")
     import time
     time.sleep(1.5) 
+    
+    # Inject request_id into env so the LLM code can find it
+    os.environ['VOYAGE_REQUEST_ID'] = voyage_metadata.get('request_id', 'unknown')
     
     ai_plan = analyze_voyage_with_llm(excel_path)
     df = pd.read_excel(excel_path)

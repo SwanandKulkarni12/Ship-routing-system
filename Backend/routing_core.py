@@ -1739,7 +1739,8 @@ async def handle_navigation(websocket):
             'co2_tonnes_saved': co2_tonnes_saved,
             'distance_saved_km': distance_saved,
             'eta_hours_saved': eta_hours_saved,
-            'label': selected_mode.title()
+            'label': selected_mode.title(),
+            'request_id': request_id
         }
         
         report_pdf_path = os.path.join(os.path.dirname(__file__), os.getenv('AI_REPORT_NAME', 'voyage_report.pdf'))
