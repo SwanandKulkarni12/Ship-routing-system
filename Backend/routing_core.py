@@ -1732,10 +1732,20 @@ async def handle_navigation(websocket):
             except Exception as exc:
                 logger.warning('request_id=%s bg_analysis_failed error=%s', request_id, exc)
 
+        report_metrics = {
+            'astar': astar_metrics,
+            'optimized': optimized_metrics,
+            'fuel_tonnes_saved': fuel_tonnes_saved,
+            'co2_tonnes_saved': co2_tonnes_saved,
+            'distance_saved_km': distance_saved,
+            'eta_hours_saved': eta_hours_saved,
+            'label': selected_mode.title()
+        }
+        
         report_pdf_path = os.path.join(os.path.dirname(__file__), os.getenv('AI_REPORT_NAME', 'voyage_report.pdf'))
         threading.Thread(
             target=_bg_llm_analysis, 
-            args=(optimized_metrics, report_pdf_path, asyncio.get_event_loop()),
+            args=(report_metrics, report_pdf_path, asyncio.get_event_loop()),
             daemon=True
         ).start()
         excel_path = None

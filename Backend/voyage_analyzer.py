@@ -29,38 +29,108 @@ def generate_voyage_pdf(analysis_data, ai_plan, output_path):
     pdf = VoyageReport()
     pdf.add_page()
     
-    # 1. Summary Section
+    # --- PAGE 1: EXECUTIVE SUMMARY ---
     pdf.set_font('helvetica', 'B', 16)
     pdf.set_text_color(20, 30, 48)
-    pdf.cell(0, 10, '1. VOYAGE SUMMARY', 0, 1, 'L')
+    pdf.cell(0, 10, '1. VOYAGE EXECUTIVE SUMMARY', 0, 1, 'L')
     pdf.set_font('helvetica', '', 11)
     
-    data = analysis_data['summary']
-    pdf.cell(90, 8, f"Total Distance: {data.get('total_dist_nm', 0):.1f} NM", 1)
-    pdf.cell(90, 8, f"Estimated Duration: {data.get('total_hours', 0):.1f} Hours", 1, 1)
-    pdf.cell(90, 8, f"Total Fuel (HFO): {data.get('fuel_tonnes', 0):.1f} MT", 1)
-    pdf.cell(90, 8, f"CO2 Emission: {data.get('co2_tonnes', 0):.1f} MT", 1, 1)
-    pdf.ln(5)
+    metrics = analysis_data['summary']
+    opt = metrics.get('optimized', {})
+    
+    # Grid layout for summary metrics
+    col_width = 95
+    line_h = 10
+    
+    pdf.set_fill_color(245, 247, 250)
+    pdf.cell(col_width, line_h, f" Total Distance: {opt.get('distance_km', 0):.1f} km", 1, 0, 'L', True)
+    pdf.cell(col_width, line_h, f" Total Duration: {opt.get('total_hours', 0):.1f} Hours", 1, 1, 'L', True)
+    
+    pdf.cell(col_width, line_h, f" Total Fuel (HFO): {opt.get('fuel_tonnes', 0):.1f} MT", 1, 0, 'L')
+    pdf.cell(col_width, line_h, f" Carbon Footprint: {opt.get('co2_tonnes', 0):.1f} MT CO2", 1, 1, 'L')
+    
+    pdf.cell(col_width, line_h, f" Average Ship Speed: {opt.get('avg_speed_kts', 12.5):.1f} kts", 1, 0, 'L', True)
+    pdf.cell(col_width, line_h, f" Operational Mode: {analysis_data.get('mode', 'Balanced').title()}", 1, 1, 'L', True)
+    pdf.ln(10)
 
-    # 2. Weather Severity
+    # 2. WEATHER & SAFETY METRICS
     pdf.set_font('helvetica', 'B', 16)
-    pdf.cell(0, 10, '2. WEATHER EXPOSURE ANALYSIS', 0, 1, 'L')
+    pdf.cell(0, 10, '2. ENVIRONMENTAL EXPOSURE & SAFETY', 0, 1, 'L')
     pdf.set_font('helvetica', '', 11)
     
     w = analysis_data['weather']
-    pdf.cell(90, 8, f"Max Wave Height: {w.get('max_wave', 0):.2f}m", 1)
-    pdf.cell(90, 8, f"Avg Wave Height: {w.get('avg_wave', 0):.2f}m", 1, 1)
-    pdf.cell(90, 8, f"Max Wind Speed: {w.get('max_wind', 0):.1f} km/h", 1)
-    pdf.cell(90, 8, f"Significant Wave Direction: {w.get('dominant_wave_dir', 0):.0f} deg", 1, 1)
-    pdf.ln(5)
+    pdf.cell(col_width, line_h, f" Peak Wave Height: {w.get('max_wave', 0):.2f}m", 1, 0, 'L')
+    pdf.cell(col_width, line_h, f" Significant Wave Dir: {w.get('dominant_wave_dir', 0):.0f} deg", 1, 1, 'L')
+    
+    pdf.cell(col_width, line_h, f" Peak Wind Speed: {w.get('max_wind', 0):.1f} km/h", 1, 0, 'L', True)
+    pdf.cell(col_width, line_h, f" Global Severity Index: {w.get('avg_severity', 0):.1f} / 100", 1, 1, 'L', True)
+    pdf.ln(10)
 
-    # 3. AI Strategic Plan
+    # 3. ECONOMIC BENCHMARKS
+    pdf.set_font('helvetica', 'B', 16)
+    pdf.cell(0, 10, '3. STRATEGIC SAVINGS (Vs. A* BASELINE)', 0, 1, 'L')
+    pdf.set_font('helvetica', '', 10)
+    
+    pdf.set_text_color(0, 128, 0) # Green for savings
+    pdf.multi_cell(0, 8, 
+        f"This optimized route achieves a gain of {metrics.get('fuel_tonnes_saved', 0):.2f} MT of fuel "
+        f"compared to the standard baseline route. This results in a reduction of "
+        f"{metrics.get('co2_tonnes_saved', 0):.2f} MT of CO2 emissions. "
+        f"Time variance: {metrics.get('eta_hours_saved', 0):.1f} hours variance recorded."
+    )
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(10)
+
+    # --- PAGE 2: WAYPOINT ANALYSIS ---
+    pdf.add_page()
+    pdf.set_font('helvetica', 'B', 16)
+    pdf.cell(0, 10, '4. WAYPOINT ANALYSIS LOG (SAMPLED)', 0, 1, 'L')
+    pdf.set_font('helvetica', 'B', 9)
+    pdf.set_fill_color(30, 45, 75)
+    pdf.set_text_color(255, 255, 255)
+    
+    # Table Header
+    cols = [('Lat', 25), ('Lon', 25), ('Wave(m)', 25), ('Wind(km/h)', 25), ('Vis(m)', 25), ('Sev/100', 25), ('Status', 40)]
+    for txt, cw in cols:
+        pdf.cell(cw, 10, txt, 1, 0, 'C', True)
+    pdf.ln()
+    
+    pdf.set_font('helvetica', '', 8)
+    pdf.set_text_color(0, 0, 0)
+    
+    df_sampled = analysis_data['dataframe_sample']
+    for i, row in df_sampled.iterrows():
+        fill = (i % 2 == 0)
+        pdf.set_fill_color(245, 245, 245)
+        
+        pdf.cell(25, 8, f"{row['Latitude']:.2f}", 1, 0, 'C', fill)
+        pdf.cell(25, 8, f"{row['Longitude']:.2f}", 1, 0, 'C', fill)
+        pdf.cell(25, 8, f"{row['Wave Height (m)']:.1f}", 1, 0, 'C', fill)
+        pdf.cell(25, 8, f"{row['Wind Speed (km/h)']:.0f}", 1, 0, 'C', fill)
+        pdf.cell(25, 8, f"{row['Visibility (m)']:.0f}", 1, 0, 'C', fill)
+        
+        sev = row['Severity Score (0-100)']
+        pdf.cell(25, 8, f"{sev:.1f}", 1, 0, 'C', fill)
+        
+        status = "LOW RISK"
+        if sev > 60: status = "SEVERE"
+        elif sev > 30: status = "CAUTION"
+        
+        if status == "SEVERE": pdf.set_text_color(200, 0, 0)
+        elif status == "CAUTION": pdf.set_text_color(180, 120, 0)
+        else: pdf.set_text_color(0, 100, 0)
+        
+        pdf.cell(40, 8, status, 1, 1, 'C', fill)
+        pdf.set_text_color(0, 0, 0)
+
+    # --- PAGE 3: AI BRIEFING ---
+    pdf.add_page()
     pdf.set_font('helvetica', 'B', 16)
     pdf.set_fill_color(240, 240, 240)
-    pdf.cell(0, 10, "3. CAPTAIN'S STRATEGIC BRIEFING (AI)", 0, 1, 'L', True)
-    pdf.ln(2)
-    pdf.set_font('helvetica', '', 10)
-    pdf.multi_cell(0, 6, ai_plan)
+    pdf.cell(0, 12, "5. CAPTAIN'S STRATEGIC BRIEFING (AI)", 0, 1, 'C', True)
+    pdf.ln(5)
+    pdf.set_font('times', '', 11)
+    pdf.multi_cell(0, 7, ai_plan)
     
     pdf.output(output_path)
     return output_path
@@ -69,7 +139,6 @@ def analyze_voyage_with_llm(excel_path):
     try:
         df = pd.read_excel(excel_path)
         
-        # Aggregate data for context
         summary_stats = {
             'wave_height': {'max': df['Wave Height (m)'].max(), 'avg': df['Wave Height (m)'].mean()},
             'wind_speed': {'max': df['Wind Speed (km/h)'].max(), 'avg': df['Wind Speed (km/h)'].mean()},
@@ -80,22 +149,28 @@ def analyze_voyage_with_llm(excel_path):
         }
         
         prompt = f"""
-        Act as a Master Mariner and Weather Router.
-        Analyze this voyage data:
-        Max Wave: {summary_stats['wave_height']['max']:.2f}m
-        Avg Wave: {summary_stats['wave_height']['avg']:.2f}m
-        Max Wind: {summary_stats['wind_speed']['max']:.1f} km/h
-        Max Current: {summary_stats['current']['max']:.2f} m/s
-        Min Visibility: {summary_stats['visibility']['min']:.0f} m
-        Peak Severity Score (0-100): {summary_stats['severity']['max']:.1f}
-        Number of Waypoints: {summary_stats['points']}
+        Act as a Senior Master Mariner and Weather Routing Specialist. 
+        Analyze the following voyage data for a deep-sea merchant vessel:
+        
+        METRICS:
+        - Max Wave Height: {summary_stats['wave_height']['max']:.2f}m
+        - Avg Wave Height: {summary_stats['wave_height']['avg']:.2f}m
+        - Max Wind Speed: {summary_stats['wind_speed']['max']:.1f} km/h
+        - Max Current: {summary_stats['current']['max']:.2f} m/s
+        - Min Visibility: {summary_stats['visibility']['min']:.0f} m
+        - Peak Severity Score (Risk Index): {summary_stats['severity']['max']:.1f} / 100
+        - Route Density: {summary_stats['points']} waypoints analyzed.
 
-        Provide a concise 'Strategic Voyage Plan' in 4-5 paragraphs. 
-        Focus on:
-        1. Safety margins given the wave heights.
-        2. Speed optimization strategy (Engine load).
-        3. Potential risk areas.
-        4. Weather avoidance advice.
+        TASK:
+        Provide a detailed 'Strategic Voyage Evaluation' addressed to the Master. 
+        Structure your response in 5-6 comprehensive paragraphs covering:
+        1. General Assessment: Overall voyage feasibility and safety baseline.
+        2. Seakeeping Strategy: Advice on heading adjustments or speed reductions during peak sea states ({summary_stats['wave_height']['max']:.2f}m peak).
+        3. Engine Room Optimization: Strategy for hull stress management vs fuel efficiency.
+        4. Tactical Risk: Interpretation of the {summary_stats['severity']['max']:.1f} Peak Severity Score.
+        5. Navigation & Bridge Orders: Specific advice on visibility and current management.
+        
+        Tone: Professional, authoritative, maritime-standard. Use "Master" to address the reader.
         """
 
         client = OpenAI(
@@ -103,13 +178,14 @@ def analyze_voyage_with_llm(excel_path):
             base_url=os.getenv('OPENAI_API_BASE', 'https://api.openai.com/v1')
         )
         
-        # If no real key, return a default professional fallback
         if os.getenv('OPENAI_API_KEY') == 'your_openai_api_key_here' or not os.getenv('OPENAI_API_KEY'):
-            return "Note: AI Analysis is in demo mode (Please provide valid OPENAI_API_KEY to enable live GPT-4 strategic planning).\n\n" + \
-                   "STRATEGIC RECOMMENDATION:\n" + \
-                   f"The voyage encounters a peak wave height of {summary_stats['wave_height']['max']:.2f}m. " + \
-                   "A conservative engine load is recommended during peak sea states to minimize hull stress. " + \
-                   "Current data suggests favorable windows for speed-up if schedule pressure exists, but sea-margins must be maintained."
+            return "NOTICE TO MASTER: AI Strategic Intelligence is currently in DEMO MODE.\n\n" + \
+                   "SUMMARY ASSESSMENT:\n" + \
+                   f"The proposed route encounters peak wave heights of {summary_stats['wave_height']['max']:.2f}m, " + \
+                   "which is within standard operating parameters but requires diligent watchkeeping. " + \
+                   f"The peak severity score of {summary_stats['severity']['max']:.1f} indicates localized areas of moderate dynamic stress. " + \
+                   "Master is advised to maintain current sea-margins and monitor hull vibration if proceeding at standard service speed. " + \
+                   "Further fuel optimization is possible by leveraging the favorable current windows identified in the passage plan."
 
         response = client.chat.completions.create(
             model=os.getenv('OPENAI_MODEL', 'gpt-4'),
@@ -117,27 +193,34 @@ def analyze_voyage_with_llm(excel_path):
         )
         return response.choices[0].message.content
     except Exception as e:
-        logger.error(f"AI Analysis failed. Columns found: {df.columns.tolist() if 'df' in locals() else 'N/A'}. Error: {e}")
+        logger.error(f"AI Analysis failed. Error: {e}")
         return f"Strategic analysis unavailable due to technical error: {str(e)}"
 
 def run_full_analysis(excel_path, voyage_metadata, output_pdf):
-    logger.info("Starting AI Voyage Analysis...")
-    # Ensure file is flushed to disk
+    logger.info("Starting Comprehensive AI Voyage Analysis...")
     import time
-    time.sleep(2) 
-    ai_plan = analyze_voyage_with_llm(excel_path)
+    time.sleep(1.5) 
     
+    ai_plan = analyze_voyage_with_llm(excel_path)
     df = pd.read_excel(excel_path)
+    
+    # Sample waypoints for the table (aim for 20-25 waypoints max for readability)
+    step = max(1, len(df) // 22)
+    df_sample = df.iloc[::step].copy().reset_index()
+    
     analysis_data = {
         'summary': voyage_metadata,
+        'dataframe_sample': df_sample,
         'weather': {
             'max_wave': df['Wave Height (m)'].max(),
             'avg_wave': df['Wave Height (m)'].mean(),
             'max_wind': df['Wind Speed (km/h)'].max(),
+            'avg_severity': df['Severity Score (0-100)'].mean(),
             'dominant_wave_dir': df['Wave Direction (°)'].mode()[0] if not df['Wave Direction (°)'].empty else 0
-        }
+        },
+        'mode': voyage_metadata.get('label', 'Standard')
     }
     
     generate_voyage_pdf(analysis_data, ai_plan, output_pdf)
-    logger.info(f"Voyage report generated: {output_pdf}")
+    logger.info(f"Multi-page voyage report generated: {output_pdf}")
     return output_pdf
