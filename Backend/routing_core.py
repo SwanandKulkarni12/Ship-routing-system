@@ -1731,8 +1731,20 @@ async def handle_navigation(websocket):
                 xl_path = os.path.join(os.path.dirname(__file__), 'route_weather_analysis.xlsx')
                 map_path = os.path.join(os.path.dirname(__file__), 'route_visualization.png')
                 
-                # Generate Route Map
-                voyage_analyzer.generate_route_plot(astar_path, opt_path, map_path)
+                # Wait for frontend screenshot to arrive (up to 10s)
+                map_existed_before = os.path.exists(map_path)
+                map_mtime_before = os.path.getmtime(map_path) if map_existed_before else 0
+                
+                for _ in range(20):  # 20 x 0.5s = 10s max wait
+                    if os.path.exists(map_path) and os.path.getmtime(map_path) > map_mtime_before:
+                        logger.info('Frontend screenshot received, using it for report')
+                        break
+                    time.sleep(0.5)
+                
+                # Fallback: generate Matplotlib plot if no fresh screenshot
+                if not os.path.exists(map_path) or os.path.getmtime(map_path) <= map_mtime_before:
+                    logger.info('No screenshot received, generating Matplotlib fallback')
+                    voyage_analyzer.generate_route_plot(astar_path, opt_path, map_path)
                 
                 # Wait briefly for Excel to finish if it's still writing
                 for _ in range(20):

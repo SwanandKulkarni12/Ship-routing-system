@@ -5,9 +5,12 @@ import logging
 from fpdf import FPDF
 from datetime import datetime
 import google.generativeai as genai
+import time as _time
 
 logger = logging.getLogger(__name__)
 
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend - safe for threads
 import matplotlib.pyplot as plt
 
 def generate_route_plot(astar_coords, optimized_coords, output_path):
@@ -343,14 +346,26 @@ def analyze_voyage_with_llm(excel_path, metrics):
         model_name = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')
         model = genai.GenerativeModel(model_name)
         
-        logger.info(f"Gemini Request: model={model_name} client_id={request_id}")
-        response = model.generate_content(prompt)
-        
-        if response.text:
-            logger.info(f"Gemini Trace: client_id={request_id} status=success")
-            return response.text
-        else:
-            raise Exception("Gemini returned empty response")
+        # Retry with backoff for rate limits (429)
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Gemini Request: model={model_name} client_id={request_id} attempt={attempt+1}")
+                response = model.generate_content(prompt)
+                
+                if response.text:
+                    logger.info(f"Gemini Trace: client_id={request_id} status=success")
+                    return response.text
+                else:
+                    raise Exception("Gemini returned empty response")
+            except Exception as retry_err:
+                err_str = str(retry_err)
+                if '429' in err_str and attempt < max_retries - 1:
+                    wait = 60 * (attempt + 1)  # 60s, 120s
+                    logger.warning(f"Gemini rate limited (attempt {attempt+1}). Retrying in {wait}s...")
+                    _time.sleep(wait)
+                else:
+                    raise
 
     except Exception as e:
         logger.error(f"AI Analysis failed. Error: {e}")
