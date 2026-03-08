@@ -340,7 +340,7 @@ def analyze_voyage_with_llm(excel_path, metrics):
                    "Further fuel optimization is possible by leveraging the favorable current windows identified in the passage plan."
 
         genai.configure(api_key=gemini_api_key)
-        model_name = os.getenv('GEMINI_MODEL', 'gemini-1.5-pro')
+        model_name = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')
         model = genai.GenerativeModel(model_name)
         
         logger.info(f"Gemini Request: model={model_name} client_id={request_id}")
