@@ -1726,9 +1726,14 @@ async def handle_navigation(websocket):
                 pareto_weather = build_weather_info_from_context(pareto_path_latlon, weather_context)
                 pareto_routes.append({'label': label, 'path': pareto_path_latlon, 'distance_km': round(calculate_total_nautical_distance(pareto_path_latlon) * 1.852, 3), 'objective_score': compute_path_cost(pareto_result['graph'], pareto_path_nodes, weight_key='weight'), 'metrics': summarize_route_metrics(label, calculate_total_nautical_distance(pareto_path_latlon) * 1.852, pareto_weather)})
         mode_explanation = build_mode_explanation(selected_mode, objective_profile, astar_metrics, optimized_metrics, fuel_saved, fuel_saved_percent, edge_diagnostics=edge_diagnostics)
-        def _bg_llm_analysis(voyage_meta, pdf_path, loop_to_use):
+        def _bg_llm_analysis(voyage_meta, pdf_path, loop_to_use, astar_path, opt_path):
             try:
                 xl_path = os.path.join(os.path.dirname(__file__), 'route_weather_analysis.xlsx')
+                map_path = os.path.join(os.path.dirname(__file__), 'route_visualization.png')
+                
+                # Generate Route Map
+                voyage_analyzer.generate_route_plot(astar_path, opt_path, map_path)
+                
                 # Wait briefly for Excel to finish if it's still writing
                 for _ in range(20):
                     if os.path.exists(xl_path): break
@@ -1755,7 +1760,7 @@ async def handle_navigation(websocket):
         report_pdf_path = os.path.join(os.path.dirname(__file__), os.getenv('AI_REPORT_NAME', 'voyage_report.pdf'))
         threading.Thread(
             target=_bg_llm_analysis, 
-            args=(report_metrics, report_pdf_path, asyncio.get_event_loop()),
+            args=(report_metrics, report_pdf_path, asyncio.get_event_loop(), new_astar, new_smooth_path),
             daemon=True
         ).start()
         excel_path = None
