@@ -74,6 +74,8 @@ def analyze_voyage_with_llm(excel_path):
             'wave_height': {'max': df['Wave Height (m)'].max(), 'avg': df['Wave Height (m)'].mean()},
             'wind_speed': {'max': df['Wind Speed (km/h)'].max(), 'avg': df['Wind Speed (km/h)'].mean()},
             'current': {'max': df['Current Velocity (m/s)'].max()},
+            'severity': {'max': df['Severity Score (0-100)'].max(), 'avg': df['Severity Score (0-100)'].mean()},
+            'visibility': {'min': df['Visibility (m)'].min()},
             'points': len(df)
         }
         
@@ -83,7 +85,9 @@ def analyze_voyage_with_llm(excel_path):
         Max Wave: {summary_stats['wave_height']['max']:.2f}m
         Avg Wave: {summary_stats['wave_height']['avg']:.2f}m
         Max Wind: {summary_stats['wind_speed']['max']:.1f} km/h
-        Max Current: {summary_stats['current']['max']:.2f} km/h
+        Max Current: {summary_stats['current']['max']:.2f} m/s
+        Min Visibility: {summary_stats['visibility']['min']:.0f} m
+        Peak Severity Score (0-100): {summary_stats['severity']['max']:.1f}
         Number of Waypoints: {summary_stats['points']}
 
         Provide a concise 'Strategic Voyage Plan' in 4-5 paragraphs. 
