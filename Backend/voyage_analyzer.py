@@ -4,7 +4,7 @@ import numpy as np
 import logging
 from fpdf import FPDF
 from datetime import datetime
-import google.generativeai as genai
+from openai import OpenAI
 import time as _time
 
 logger = logging.getLogger(__name__)
@@ -301,8 +301,19 @@ def analyze_voyage_with_llm(excel_path, metrics):
         # Pull request_id from env
         request_id = os.getenv('VOYAGE_REQUEST_ID', 'unknown-req')
 
-        astar = summary_stats.get('astar', {})
-        opt = summary_stats.get('optimized', {})
+        # Build condensed weather digest (top 5 danger zones + stats)
+        top5_danger = df.nlargest(5, 'Severity Score (0-100)')[
+            ['Latitude', 'Longitude', 'Wave Height (m)', 'Wind Speed (km/h)', 'Visibility (m)', 'Severity Score (0-100)']
+        ]
+        danger_rows = ""
+        for _, row in top5_danger.iterrows():
+            danger_rows += f"  ({row['Latitude']:.2f}°, {row['Longitude']:.2f}°) Wave={row['Wave Height (m)']:.1f}m Wind={row['Wind Speed (km/h)']:.0f}km/h Vis={row['Visibility (m)']:.0f}m Severity={row['Severity Score (0-100)']:.1f}\n"
+        
+        # Risk distribution
+        low_risk = len(df[df['Severity Score (0-100)'] <= 30])
+        mod_risk = len(df[(df['Severity Score (0-100)'] > 30) & (df['Severity Score (0-100)'] <= 60)])
+        high_risk = len(df[df['Severity Score (0-100)'] > 60])
+        total_pts = len(df)
 
         prompt = f"""
         Act as a Senior Master Mariner and Weather Routing Specialist. 
@@ -314,11 +325,20 @@ def analyze_voyage_with_llm(excel_path, metrics):
         - Fuel Burn: {astar.get('fuel_tonnes', 0):.1f}MT (Baseline) vs {opt.get('fuel_tonnes', 0):.1f}MT (Optimized)
         - Safety Risk: {astar.get('risk_score', 0):.1f}% (Baseline) vs {opt.get('risk_score', 0):.1f}% (Optimized)
 
-        ENVIRONMENTAL PEAKS (Optimized):
-        - Max Wave Height: {summary_stats['wave_height']['max']:.2f}m
-        - Max Wind Speed: {summary_stats['wind_speed']['max']:.1f} km/h
-        - Min Visibility: {summary_stats['visibility']['min']:.0f} m
+        ENVIRONMENTAL STATISTICS ({total_pts} waypoints analyzed):
+        - Wave Height: Min={df['Wave Height (m)'].min():.2f}m | Avg={summary_stats['wave_height']['avg']:.2f}m | Max={summary_stats['wave_height']['max']:.2f}m
+        - Wind Speed:  Min={df['Wind Speed (km/h)'].min():.1f} | Avg={summary_stats['wind_speed']['avg']:.1f} | Max={summary_stats['wind_speed']['max']:.1f} km/h
+        - Visibility:  Min={summary_stats['visibility']['min']:.0f}m | Avg={df['Visibility (m)'].mean():.0f}m | Max={df['Visibility (m)'].max():.0f}m
+        - Current:     Max={summary_stats['current']['max']:.2f} m/s
+        - Severity:    Avg={summary_stats['severity']['avg']:.1f} | Max={summary_stats['severity']['max']:.1f} / 100
 
+        RISK DISTRIBUTION:
+        - Low Risk (0-30):     {low_risk}/{total_pts} waypoints ({100*low_risk/total_pts:.0f}%)
+        - Moderate (30-60):    {mod_risk}/{total_pts} waypoints ({100*mod_risk/total_pts:.0f}%)
+        - High/Gale (60-100):  {high_risk}/{total_pts} waypoints ({100*high_risk/total_pts:.0f}%)
+
+        TOP 5 HIGHEST-RISK WAYPOINTS:
+{danger_rows}
         TASK:
         Provide a detailed 'Strategic Voyage Evaluation' addressed to the Master. 
         Explain WHY the Optimized route was selected over the Baseline (e.g., fuel savings, safety detours, or time optimization).
@@ -326,15 +346,15 @@ def analyze_voyage_with_llm(excel_path, metrics):
         1. Comparative Assessment: Justification of the optimized path vs the baseline.
         2. Seakeeping Strategy: Advice on peak sea states ({summary_stats['wave_height']['max']:.2f}m peak).
         3. Engine Room Optimization: Strategy for hull stress management vs fuel efficiency.
-        4. Tactical Risk: Interpretation of the {opt.get('risk_score', 0):.1f}% average risk vs the baseline.
-        5. Navigation & Bridge Orders: Specific advice on visibility and current management.
+        4. Tactical Risk: Interpretation of the {opt.get('risk_score', 0):.1f}% average risk vs the baseline, referencing the risk distribution.
+        5. Navigation & Bridge Orders: Specific advice on the {high_risk} high-risk waypoints and visibility management.
         
         Tone: Professional, authoritative, maritime-standard. Use "Master" to address the reader.
         """
 
-        gemini_api_key = os.getenv('GEMINI_API_KEY')
-        if not gemini_api_key or gemini_api_key == 'your_gemini_api_key_here':
-            return "NOTICE TO MASTER: AI Strategic Intelligence is currently in DEMO MODE (Gemini API Key missing).\n\n" + \
+        openai_api_key = os.getenv('OPENAI_API_KEY')
+        if not openai_api_key or openai_api_key == 'your_openai_api_key_here':
+            return "NOTICE TO MASTER: AI Strategic Intelligence is currently in DEMO MODE (OpenAI API Key missing).\n\n" + \
                    "SUMMARY ASSESSMENT:\n" + \
                    f"The proposed route encounters peak wave heights of {summary_stats['wave_height']['max']:.2f}m, " + \
                    "which is within standard operating parameters but requires diligent watchkeeping. " + \
@@ -342,27 +362,30 @@ def analyze_voyage_with_llm(excel_path, metrics):
                    "Master is advised to maintain current sea-margins and monitor hull vibration if proceeding at standard service speed. " + \
                    "Further fuel optimization is possible by leveraging the favorable current windows identified in the passage plan."
 
-        genai.configure(api_key=gemini_api_key)
-        model_name = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')
-        model = genai.GenerativeModel(model_name)
+        client = OpenAI(api_key=openai_api_key)
+        model_name = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
         
         # Retry with backoff for rate limits (429)
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                logger.info(f"Gemini Request: model={model_name} client_id={request_id} attempt={attempt+1}")
-                response = model.generate_content(prompt)
+                logger.info(f"OpenAI Request: model={model_name} client_id={request_id} attempt={attempt+1}")
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=[{"role": "user", "content": prompt}]
+                )
                 
-                if response.text:
-                    logger.info(f"Gemini Trace: client_id={request_id} status=success")
-                    return response.text
+                result_text = response.choices[0].message.content
+                if result_text:
+                    logger.info(f"OpenAI Trace: client_id={request_id} status=success")
+                    return result_text
                 else:
-                    raise Exception("Gemini returned empty response")
+                    raise Exception("OpenAI returned empty response")
             except Exception as retry_err:
                 err_str = str(retry_err)
                 if '429' in err_str and attempt < max_retries - 1:
-                    wait = 60 * (attempt + 1)  # 60s, 120s
-                    logger.warning(f"Gemini rate limited (attempt {attempt+1}). Retrying in {wait}s...")
+                    wait = 60 * (attempt + 1)
+                    logger.warning(f"OpenAI rate limited (attempt {attempt+1}). Retrying in {wait}s...")
                     _time.sleep(wait)
                 else:
                     raise
