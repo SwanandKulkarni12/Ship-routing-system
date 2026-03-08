@@ -1549,9 +1549,18 @@ async def handle_navigation(websocket):
             await _hb_task
 
         # Trigger Excel export as soon as weather is ready
+        def _bg_excel_export(points, weather, marine, loop_to_use):
+            try:
+                export_weather_to_excel(points, weather, marine)
+                msg = json.dumps({'type': 'excel_ready', 'excel_url': '/reports/route_weather_analysis.xlsx'})
+                asyncio.run_coroutine_threadsafe(websocket.send_str(msg), loop_to_use)
+                logger.info('request_id=%s excel_ready_sent', request_id)
+            except Exception as e:
+                logger.error('request_id=%s excel_export_failed error=%s', request_id, e)
+
         threading.Thread(
-            target=export_weather_to_excel, 
-            args=(weather_context.get('grid_points', []), weather_context.get('current_weather_lookup', {}), weather_context.get('current_marine_lookup', {})),
+            target=_bg_excel_export, 
+            args=(weather_context.get('grid_points', []), weather_context.get('current_weather_lookup', {}), weather_context.get('current_marine_lookup', {}), asyncio.get_event_loop()),
             daemon=True
         ).start()
         logger.info('request_id=%s weather_context_build=%.2fs grid_points=%s (Excel export started in background)', request_id, time.perf_counter() - t0, len(weather_context.get('grid_points', [])))

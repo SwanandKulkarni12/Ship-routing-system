@@ -30,6 +30,7 @@ function App() {
   const [optimizedWeather, setOptimizedWeather]  = useState([]);
   const [metrics,          setMetrics]           = useState(null);
   const [reportUrl,        setReportUrl]         = useState(null);
+  const [excelUrl,         setExcelUrl]          = useState(null);
   const [progress,         setProgress]          = useState({ pct: 0, step: '' });
   const [mode,             setMode]              = useState('balanced');
   const [start,            setStart]             = useState('');
@@ -462,6 +463,7 @@ function App() {
       setProgress({ pct: 3, step: 'Preparing request…' });
       setStatus('Calculating Routes...');
       setReportUrl(null);
+      setExcelUrl(null);
       wsRef.current.send(JSON.stringify({ type: 'start',
         start: start.split(',').map(Number),
         end:   end.split(',').map(Number),
@@ -486,6 +488,8 @@ function App() {
         setTimeout(() => setProgress({ pct: 0, step: '' }), 2000);
       } else if (data.type === 'report_ready') {
         setReportUrl(data.report_url);
+      } else if (data.type === 'excel_ready') {
+        setExcelUrl(data.excel_url);
       } else if (data.type === 'error') {
         setProgress({ pct: 0, step: '' });
         setStatus(`Error: ${data.message}`);
@@ -697,7 +701,7 @@ function App() {
         )}
       </div>
       {showMetrics && metrics && <MetricsPanel metrics={metrics} mode={mode} />}
-      {metrics && <ResultBanner metrics={metrics} reportUrl={reportUrl} />}
+      {metrics && <ResultBanner metrics={metrics} reportUrl={reportUrl} excelUrl={excelUrl} />}
       {}
       <div style={legendDockStyle}>
         <div style={legendBarStyle}>

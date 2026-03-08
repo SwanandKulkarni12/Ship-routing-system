@@ -12,7 +12,7 @@ function BannerPill({ icon, label, value, color }) {
     </div>
   );
 }
-export default function ResultBanner({ metrics, reportUrl }) {
+export default function ResultBanner({ metrics, reportUrl, excelUrl }) {
   if (!metrics?.optimized || !metrics?.astar) return null;
   const riskDelta   = metrics.astar.risk_score - metrics.optimized.risk_score;
   const fuelSaved   = metrics.fuel_tonnes_saved ?? 0;
@@ -36,6 +36,21 @@ export default function ResultBanner({ metrics, reportUrl }) {
   const distDisplayDiffers = Math.round(Math.abs(distSaved)) > 0;
   const riskDisplayDiffers = Math.abs(riskDelta) >= 0.05 &&
     Number(metrics.astar.risk_score).toFixed(1) !== Number(metrics.optimized.risk_score).toFixed(1);
+
+  const btnStyle = {
+    textDecoration: 'none',
+    color: '#000',
+    padding: '10px 22px',
+    borderRadius: 20,
+    fontWeight: 800,
+    fontSize: 12,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+    pointerEvents: 'auto',
+    letterSpacing: '0.02em'
+  };
 
   return (
     <div style={{
@@ -69,31 +84,52 @@ export default function ResultBanner({ metrics, reportUrl }) {
         <BannerPill icon="📏" label="Distance added"  value={`${Math.round(Math.abs(distSaved))} km`}    color="#ffaa40" />
       )}
 
-      {reportUrl && (
-        <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center' }}>
-          <a 
-            href={`http://localhost:5000${reportUrl}`} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            style={{
-              textDecoration: 'none',
-              background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
-              color: '#000',
-              padding: '10px 24px',
-              borderRadius: 20,
-              fontWeight: 800,
-              fontSize: 13,
-              boxShadow: '0 4px 15px rgba(255, 215, 0, 0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              transition: 'transform 0.2s',
-            }}
-            onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'}
-            onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
-          >
-            <span>📄</span> DOWNLOAD AI VOYAGE PLAN
-          </a>
+      {(excelUrl || reportUrl) && (
+        <div style={{ pointerEvents: 'none', display: 'flex', gap: 10, alignItems: 'center', marginTop: 8 }}>
+          {excelUrl && (
+             <a 
+               href={`http://localhost:5000${excelUrl}`} 
+               download="Voyage_Weather_Log.xlsx"
+               style={{
+                 ...btnStyle,
+                 background: 'linear-gradient(135deg, #00C9FF 0%, #92FE9D 100%)',
+                 boxShadow: '0 4px 15px rgba(0, 201, 255, 0.3)',
+               }}
+               onMouseOver={e => {
+                 e.currentTarget.style.transform = 'translateY(-3px)';
+                 e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 201, 255, 0.4)';
+               }}
+               onMouseOut={e => {
+                 e.currentTarget.style.transform = 'translateY(0)';
+                 e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 201, 255, 0.3)';
+               }}
+             >
+               <span>📊</span> WEATHER LOG (XLSX)
+             </a>
+          )}
+
+          {reportUrl && (
+            <a 
+              href={`http://localhost:5000${reportUrl}`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              style={{
+                ...btnStyle,
+                background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+                boxShadow: '0 4px 15px rgba(255, 215, 0, 0.4)',
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.transform = 'translateY(-3px)';
+                e.currentTarget.style.boxShadow = '0 8px 25px rgba(255, 215, 0, 0.6)';
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(255, 215, 0, 0.4)';
+              }}
+            >
+              <span>📄</span> VOYAGE REPORT (PDF)
+            </a>
+          )}
         </div>
       )}
     </div>
