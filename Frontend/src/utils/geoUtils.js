@@ -5,7 +5,7 @@ const WATER_TYPES = new Set([
 export async function isWaterCoordinate(lat, lon) {
   try {
     const resp = await fetch(
-      `https:
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
       { headers: { 'Accept-Language': 'en' } },
     );
     const data = await resp.json();

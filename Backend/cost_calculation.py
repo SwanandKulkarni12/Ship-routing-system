@@ -15,10 +15,10 @@ def compute_safety_risk(current_weather, current_marine):
     wave = safe_get(current_marine, 'wave_height', 0.0)
     precip = safe_get(current_weather, 'precipitation', 0.0)
     vis = safe_get(current_weather, 'visibility', 10000.0)
-    WAVE_THRESHOLD = 2.2   # Sea State 4 boundary
-    WIND_THRESHOLD = 28.0  # ~15 knots, light breeze
-    WAVE_FULL_SEV = 8.0    # Sea State 7 "High" — course change mandatory
-    WIND_FULL_SEV = 90.0   # Beaufort 9 "Strong Gale"
+    WAVE_THRESHOLD = 2.2 
+    WIND_THRESHOLD = 28.0 
+    WAVE_FULL_SEV = 8.0    
+    WIND_FULL_SEV = 90.0   
     if wave <= WAVE_THRESHOLD:
         wave_sev = 0.0
     else:
