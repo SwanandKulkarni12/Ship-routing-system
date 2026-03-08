@@ -12,13 +12,11 @@ HEX_LATTICE_MAX_POINTS = int(os.getenv('HEX_LATTICE_MAX_POINTS', '2200'))
 HEX_LATTICE_ATTACH_K = int(os.getenv('HEX_LATTICE_ATTACH_K', '3'))
 HEX_LATTICE_ATTACH_MAX_KM = float(os.getenv('HEX_LATTICE_ATTACH_MAX_KM', '35.0'))
 HEX_LATTICE_NEIGHBOR_KM = float(os.getenv('HEX_LATTICE_NEIGHBOR_KM', '65.0'))
-
 def _haversine_km(node_a, node_b):
     lon1, lat1 = (float(node_a[0]), float(node_a[1]))
     lon2, lat2 = (float(node_b[0]), float(node_b[1]))
     distance = haversine_distance(lat1, lon1, np.array([lat2]), np.array([lon2]))
     return float(distance[0])
-
 def _hex_points_for_bbox(min_lon, max_lon, min_lat, max_lat, spacing_deg):
     if max_lon <= min_lon or max_lat <= min_lat:
         return []
@@ -39,7 +37,6 @@ def _hex_points_for_bbox(min_lon, max_lon, min_lat, max_lat, spacing_deg):
         return points
     stride = max(1, int(np.ceil(len(points) / HEX_LATTICE_MAX_POINTS)))
     return points[::stride][:HEX_LATTICE_MAX_POINTS]
-
 def _augment_subgraph_with_hex_lattice(base_subgraph, a_star_path):
     if not HEX_LATTICE_ENABLED:
         return base_subgraph
@@ -102,7 +99,6 @@ def _augment_subgraph_with_hex_lattice(base_subgraph, a_star_path):
             augmented.add_edge(u, v, weight=d_uv, distance=d_uv)
     logger.info('[subgraph-builder] hex lattice added nodes=%s total_nodes=%s total_edges=%s', len(kept_points), augmented.number_of_nodes(), augmented.number_of_edges())
     return augmented
-
 def build_subgraph(G, tree, node_array, a_star_path, radius_km=700):
     earth_radius_km = 6371
     radius_rad = radius_km / earth_radius_km

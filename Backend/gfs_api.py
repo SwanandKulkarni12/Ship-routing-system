@@ -14,26 +14,22 @@ _PARALLEL_DL = 8
 _DL_TIMEOUT_S = 45
 _PUBLISH_DELAY_H = 4
 _MAX_RUN_TRIES = 3
-
 def gfs_available() -> bool:
     try:
         import cfgrib
         return True
     except ImportError:
         return False
-
 def _latest_gfs_run(now_utc: datetime, offset_runs: int=0) -> tuple[str, str]:
     lag = now_utc - timedelta(hours=_PUBLISH_DELAY_H + offset_runs * 6)
     run_hour = lag.hour // 6 * 6
     run_time = lag.replace(hour=run_hour, minute=0, second=0, microsecond=0)
     return (run_time.strftime('%Y%m%d'), f'{run_hour:02d}')
-
 def _nomads_url(date_str: str, run_str: str, step: int, lat_s: float, lat_n: float, lon_w: float, lon_e: float) -> str:
     fname = f'gfs.t{run_str}z.pgrb2.0p25.f{step:03d}'
     dir_path = f'%2Fgfs.{date_str}%2F{run_str}%2Fatmos'
     return f'{_NOMADS_BASE}?file={fname}&lev_10_m_above_ground=on&lev_surface=on&var_UGRD=on&var_VGRD=on&var_APCP=on&subregion=&leftlon={lon_w:.2f}&rightlon={lon_e:.2f}&toplat={lat_n:.2f}&bottomlat={lat_s:.2f}&dir={dir_path}'
 _GRIB_MAGIC = b'GRIB'
-
 def _download_step(step: int, url: str, tmp_dir: str) -> tuple[int, str] | None:
     out_path = os.path.join(tmp_dir, f'gfs_f{step:03d}.grib2')
     try:
@@ -51,7 +47,6 @@ def _download_step(step: int, url: str, tmp_dir: str) -> tuple[int, str] | None:
     except Exception as exc:
         logger.debug('[gfs] step %3dh download error: %s', step, exc)
         return None
-
 def _parse_step_grib(path: str) -> tuple | None:
     import cfgrib
     try:
@@ -115,7 +110,6 @@ def _parse_step_grib(path: str) -> tuple | None:
     if tp is None:
         tp = np.zeros_like(u10)
     return (u10, v10, tp, lats, lons)
-
 def fetch_gfs_atmospheric_grid(min_lat: float, max_lat: float, min_lon: float, max_lon: float, forecast_hours: int=72) -> dict | None:
     if not gfs_available():
         logger.debug('[gfs] cfgrib/xarray not available — skipping')
@@ -179,7 +173,6 @@ def fetch_gfs_atmospheric_grid(min_lat: float, max_lat: float, min_lon: float, m
             continue
     logger.warning('[gfs] all %d run attempts failed — falling back to Open-Meteo', _MAX_RUN_TRIES)
     return None
-
 def interpolate_gfs_at_point(grid: dict, lat: float, lon: float, hour: int=0) -> dict:
     if grid is None:
         return {}
@@ -215,7 +208,6 @@ def interpolate_gfs_at_point(grid: dict, lat: float, lon: float, hour: int=0) ->
     except Exception as exc:
         logger.debug('[gfs] interpolation failed: %s', exc)
         return {}
-
 def build_hourly_weather_lookup_from_gfs(grid_points: list, gfs_grid: dict, forecast_hours: int=72) -> dict:
     lookup = {}
     steps = gfs_grid.get('steps', [0])

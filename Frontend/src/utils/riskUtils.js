@@ -163,4 +163,4 @@ export function buildWeatherRasterCanvas(severityPoints) {
       [bMinLon, bMinLat],
     ],
   };
-}
+}

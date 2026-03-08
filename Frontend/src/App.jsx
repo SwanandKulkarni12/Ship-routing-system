@@ -43,26 +43,22 @@ function App() {
   const [showRouteDots,    setShowRouteDots]     = useState(false);
   const [manualStart,      setManualStart]       = useState('');
   const [manualEnd,        setManualEnd]         = useState('');
-  // ── Refs ───────────────────────────────────────────────────────────────────
   const mapContainerRef = useRef(null);
   const mapRef          = useRef(null);
   const wsRef           = useRef(null);
   const pickModeRef     = useRef(null);
   const startMarkerRef  = useRef(null);
   const endMarkerRef    = useRef(null);
-  // Always-current route coords for the animation RAF loop (avoids re-creating the loop)
   const coordsRef        = useRef([]);
   const astarCoordsRef   = useRef([]);
   const shipAnimatingRef = useRef(false);
   useEffect(() => { pickModeRef.current     = pickMode;      }, [pickMode]);
   useEffect(() => { shipAnimatingRef.current = shipAnimating; }, [shipAnimating]);
-  // Crosshair cursor while the user is picking a map point
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     map.getCanvas().style.cursor = pickMode ? 'crosshair' : '';
   }, [pickMode]);
-  // ── Helpers ────────────────────────────────────────────────────────────────
   const clearRouteState = useCallback(() => {
     setCoordinates([]);
     setAstarCoordinates([]);
@@ -119,7 +115,6 @@ function App() {
     placeMarkerFromCoord(manualEnd,   'end');
     setCoordWarning('');
   }, [manualStart, manualEnd, clearRouteState, placeMarkerFromCoord]);
-  // ── Map initialisation ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!mapContainerRef.current) return;
     const map = new MLMap({

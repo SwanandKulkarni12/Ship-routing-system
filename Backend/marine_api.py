@@ -2,11 +2,8 @@ import os
 import logging
 import numpy as np
 logger = logging.getLogger(__name__)
-
-# Silencing chatty industrial libraries
 for lib in ['copernicusmarine', 'urllib3', 'requests', 'aiohttp']:
     logging.getLogger(lib).setLevel(logging.ERROR)
-
 def cmems_available() -> bool:
     try:
         import copernicusmarine
@@ -20,7 +17,6 @@ _PHYSICS_DATASET = 'cmems_mod_glo_phy_anfc_0.083deg_PT1H-m'
 _WAVE_DATASET = 'cmems_mod_glo_wav_anfc_0.083deg_PT3H-i'
 _PHYSICS_VARS = ['uo', 'vo']
 _WAVE_VARS = ['VHM0', 'VMDR']
-
 def fetch_cmems_marine_grid(min_lat: float, max_lat: float, min_lon: float, max_lon: float, forecast_hours: int=72) -> dict | None:
     if not cmems_available():
         logger.debug('[cmems] not available — skipping')
@@ -56,7 +52,6 @@ def fetch_cmems_marine_grid(min_lat: float, max_lat: float, min_lon: float, max_
     except Exception as exc:
         logger.warning('[cmems] fetch failed: %s — falling back to Open-Meteo marine', exc)
         return None
-
 def interpolate_cmems_at_point(cmems_grid: dict, lat: float, lon: float) -> dict:
     if cmems_grid is None:
         return {}
@@ -95,11 +90,9 @@ def interpolate_cmems_at_point(cmems_grid: dict, lat: float, lon: float) -> dict
     current_speed_ms = np.hypot(cu, cv)
     current_dir = (np.degrees(np.arctan2(cu, cv)) + 360) % 360
     return {'wave_height': round(max(wh, 0.0), 3), 'wave_direction': round(wave_dir, 1), 'ocean_current_velocity': round(current_speed_ms * 3.6, 3), 'ocean_current_direction': round(current_dir, 1)}
-
 def _safe_2d(arr) -> list:
     a = np.where(np.isfinite(arr), arr, 0.0)
     return a.tolist()
-
 def _safe_val(grid, li, lj, default=0.0) -> float:
     try:
         v = float(grid[li, lj])

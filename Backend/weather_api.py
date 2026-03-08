@@ -2,19 +2,14 @@ import requests_cache
 from retry_requests import retry
 import openmeteo_requests
 import logging
-
 logger = logging.getLogger(__name__)
-
 class OpenMeteoRateLimitError(Exception):
-
     def __init__(self, message, retry_after=None):
         super().__init__(message)
         self.retry_after = retry_after
-
 cache_session = requests_cache.CachedSession('.weather_cache', expire_after=21600)
 retry_session = retry(cache_session, retries=3, backoff_factor=0.5)
 openmeteo = openmeteo_requests.Client(session=retry_session)
-
 def _is_rate_limit_error(exc):
     response = getattr(exc, 'response', None)
     if response is not None and getattr(response, 'status_code', None) == 429:
@@ -23,13 +18,11 @@ def _is_rate_limit_error(exc):
     return ('429' in message or 'too many requests' in message or 'rate limit' in message
             or 'limit exceeded' in message or 'try again in one minute' in message
             or 'minutely api request limit exceeded' in message)
-
 def _extract_retry_after_seconds(exc):
     message = str(exc).lower()
     if 'one minute' in message:
         return 60
     return None
-
 def fetch_weather_data_hourly(lat, lon, forecast_hours=72):
     url = 'https://api.open-meteo.com/v1/forecast'
     params = {
@@ -62,7 +55,6 @@ def fetch_weather_data_hourly(lat, lon, forecast_hours=72):
         logger.warning('Hourly weather API error: %s', e)
         fallback = [{'wind_speed_10m': 10.0, 'wind_direction_10m': 180.0, 'precipitation': 0.0, 'visibility': 10000.0}] * forecast_hours
         return [fallback for _ in lat]
-
 def fetch_marine_data_hourly(lat, lon, forecast_hours=72):
     url = 'https://marine-api.open-meteo.com/v1/marine'
     params = {

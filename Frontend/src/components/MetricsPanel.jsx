@@ -181,4 +181,4 @@ export default function MetricsPanel({ metrics, mode }) {
 }
 function diff(a, b) {
   return a != null && b != null ? a - b : null;
-}
+}

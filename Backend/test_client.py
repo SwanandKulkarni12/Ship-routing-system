@@ -3,7 +3,6 @@ import json
 import websockets
 import time
 TEST_CASES = [{'name': 'Short Distance - Baltic Sea', 'payload': {'start': [18.5, 54.5], 'end': [24.5, 59.5], 'mode': 'distance'}}, {'name': 'Medium Distance - North Atlantic (Balanced)', 'payload': {'start': [-60.0, 45.0], 'end': [-10.0, 50.0], 'mode': 'balanced'}}, {'name': 'Long Distance - Trans-Pacific (Safety)', 'payload': {'start': [140.0, 35.0], 'end': [-125.0, 45.0], 'mode': 'safety'}}, {'name': 'Medium Distance - Indian Ocean (Fuel)', 'payload': {'start': [55.0, 20.0], 'end': [100.0, -5.0], 'mode': 'fuel consumption'}}]
-
 async def run_test(case):
     uri = 'ws://localhost:5000'
     print(f"\n--- Running Test: {case['name']} (Mode: {case['payload']['mode']}) ---")
@@ -35,7 +34,6 @@ async def run_test(case):
                     break
     except Exception as e:
         print(f'[TEST EXCEPTION] {e}')
-
 async def main():
     print('Starting WebSocket tests based on different modes and coordinates...')
     for case in TEST_CASES:

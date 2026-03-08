@@ -50,7 +50,6 @@ BALANCED_MAX_DISTANCE_INCREASE_PCT = float(os.getenv('BALANCED_MAX_DISTANCE_INCR
 BALANCED_MAX_ETA_INCREASE_HOURS = float(os.getenv('BALANCED_MAX_ETA_INCREASE_HOURS', '1.0'))
 BALANCED_MAX_FUEL_INCREASE_PCT = float(os.getenv('BALANCED_MAX_FUEL_INCREASE_PCT', '2.0'))
 BALANCED_MIN_RISK_GAIN_PTS_FOR_REGRESSION = float(os.getenv('BALANCED_MIN_RISK_GAIN_PTS_FOR_REGRESSION', '2.0'))
-
 def _env_bool(name, default=False):
     value = os.getenv(name)
     if value is None:
@@ -103,9 +102,7 @@ CONSTRAINED_SMOOTH_MAX_POINTS = int(os.getenv('CONSTRAINED_SMOOTH_MAX_POINTS', '
 ENDPOINT_CONNECTOR_MAX_STEP_KM = float(os.getenv('ENDPOINT_CONNECTOR_MAX_STEP_KM', '4.0'))
 WEATHER_CUBE_CACHE = {}
 ROUTE_RESPONSE_CACHE = {}
-
 class AsyncRateLimiter:
-
     def __init__(self, calls_per_minute, calls_per_hour, calls_per_day=None):
         self.calls_per_minute = max(calls_per_minute, 1)
         self.calls_per_hour = max(calls_per_hour, 1)
@@ -113,7 +110,6 @@ class AsyncRateLimiter:
         self.calls = []
         self.lock = asyncio.Lock()
         self.extra_sleep = 0.0
-
     async def wait_for_slot(self, units=1):
         units = max(1, int(units))
         async with self.lock:
@@ -145,7 +141,6 @@ class AsyncRateLimiter:
             stamp = time.time()
             self.calls.extend([stamp] * units)
             self.extra_sleep = 0.0
-
     def on_rate_limit(self, retry_index, retry_after=None):
         jitter = random.uniform(0.0, 0.5)
         backoff = min(120.0, 2 ** retry_index + jitter)
@@ -154,7 +149,6 @@ class AsyncRateLimiter:
         self.extra_sleep = min(120.0, max(self.extra_sleep, backoff))
         logger.warning('[rate-limiter] 429 detected retry=%s next_wait=%.1fs', retry_index + 1, self.extra_sleep)
 RATE_LIMITER = AsyncRateLimiter(calls_per_minute=OPEN_METEO_MAX_CALLS_PER_MIN, calls_per_hour=OPEN_METEO_MAX_CALLS_PER_HOUR, calls_per_day=OPEN_METEO_MAX_CALLS_PER_DAY)
-
 def haversine_distance(coord1, coord2):
     lon1, lat1 = coord1
     lon2, lat2 = coord2
@@ -164,14 +158,12 @@ def haversine_distance(coord1, coord2):
     a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
     return R_NM * c
-
 def calculate_total_nautical_distance(path):
     total_distance = 0
     for i in range(len(path) - 1):
         dist = haversine_distance(path[i], path[i + 1])
         total_distance += dist
     return total_distance
-
 def sample_path_locations_for_weather(path_lon_lat, max_points=40):
     if not path_lon_lat:
         return []
@@ -184,7 +176,6 @@ def sample_path_locations_for_weather(path_lon_lat, max_points=40):
         lon, lat = path_lon_lat[-1]
         sampled.append(_quantize_location(lat, lon, precision=2))
     return list(dict.fromkeys(sampled))
-
 async def choose_corridor_radius_km(a_star_path):
     sampled_locations = sample_path_locations_for_weather(a_star_path, max_points=45)
     if not sampled_locations:
@@ -214,7 +205,6 @@ async def choose_corridor_radius_km(a_star_path):
         reason = 'normal_weather'
     radius = int(min(max(radius, CORRIDOR_MIN_RADIUS_KM), CORRIDOR_MAX_RADIUS_KM))
     return (radius, {'max_wind_kmh': round(max_wind, 2), 'max_wave_m': None, 'reason': reason})
-
 def get_objective_profile(mode):
     if not mode:
         return (OBJECTIVE_PROFILES['balanced'], 'balanced')
@@ -224,7 +214,6 @@ def get_objective_profile(mode):
     if normalized in OBJECTIVE_PROFILES:
         return (OBJECTIVE_PROFILES[normalized], normalized)
     return (OBJECTIVE_PROFILES['balanced'], 'balanced')
-
 def _calculate_geographic_bearing(pointA, pointB):
     lat1, lon1 = (np.radians(pointA[1]), np.radians(pointA[0]))
     lat2, lon2 = (np.radians(pointB[1]), np.radians(pointB[0]))
@@ -233,17 +222,14 @@ def _calculate_geographic_bearing(pointA, pointB):
     y = np.cos(lat1) * np.sin(lat2) - np.sin(lat1) * np.cos(lat2) * np.cos(dlon)
     initial_bearing = np.arctan2(x, y)
     return (np.degrees(initial_bearing) + 360) % 360
-
 def _quantize_location(lat, lon, precision=3):
     return (round(float(lat), precision), round(float(lon), precision))
-
 def _utc_model_run_key(interval_hours=WEATHER_MODEL_RUN_INTERVAL_HOURS):
     interval_hours = max(1, int(interval_hours))
     now_utc = datetime.now(timezone.utc)
     slot_hour = now_utc.hour // interval_hours * interval_hours
     slot_dt = now_utc.replace(hour=slot_hour, minute=0, second=0, microsecond=0)
     return slot_dt.strftime('%Y%m%d%H')
-
 def _prune_cache_entries(cache_dict, max_entries):
     if len(cache_dict) <= max_entries:
         return
@@ -251,13 +237,11 @@ def _prune_cache_entries(cache_dict, max_entries):
     to_remove = len(cache_dict) - max_entries
     for key in ordered_keys[:to_remove]:
         cache_dict.pop(key, None)
-
 def build_fixed_corridor_grid_points(nodes_lon_lat, max_points=CORRIDOR_GRID_MAX_POINTS):
     if not nodes_lon_lat:
         return []
     points = list(dict.fromkeys((_quantize_location(float(node[1]), float(node[0]), precision=2) for node in nodes_lon_lat)))
     return points
-
 def _weather_cube_cache_key(subgraph, forecast_hours):
     nodes = list(subgraph.nodes())
     if not nodes:
@@ -269,7 +253,6 @@ def _weather_cube_cache_key(subgraph, forecast_hours):
     min_lat = round(min(lats), 1)
     max_lat = round(max(lats), 1)
     return (_utc_model_run_key(), min_lon, max_lon, min_lat, max_lat, round(CORRIDOR_GRID_SPACING_DEG, 3), int(CORRIDOR_GRID_MAX_POINTS), int(forecast_hours))
-
 def estimate_node_arrival_hours(subgraph, end_node, total_distance_km):
     arrival_hours = {}
     if total_distance_km is None or not np.isfinite(total_distance_km) or total_distance_km <= 0:
@@ -284,7 +267,6 @@ def estimate_node_arrival_hours(subgraph, end_node, total_distance_km):
             dist_from_start_km = max(0.0, total_distance_km - remaining_km)
             arrival_hours[node] = int(dist_from_start_km / max(ROUTING_BASE_SPEED_KMH, 0.1))
     return arrival_hours
-
 def _derive_current_from_hourly(grid_points, hourly_weather_lookup, hourly_marine_lookup):
     weather_lookup = {}
     marine_lookup = {}
@@ -295,11 +277,9 @@ def _derive_current_from_hourly(grid_points, hourly_weather_lookup, hourly_marin
         marine_lookup[loc] = {'current': dict(marine_series[0]) if marine_series else {}}
     weather_lookup, marine_lookup = impute_missing_weather_from_neighbors(grid_points, weather_lookup, marine_lookup)
     return (weather_lookup, marine_lookup)
-
 def _build_weather_cube_arrays(grid_points, hourly_weather_lookup, hourly_marine_lookup, forecast_hours):
     n_points = len(grid_points)
     n_hours = max(1, int(forecast_hours))
-
     def to_matrix(lookup, field_name):
         matrix = np.full((n_points, n_hours), np.nan, dtype=np.float32)
         for idx, loc in enumerate(grid_points):
@@ -314,7 +294,6 @@ def _build_weather_cube_arrays(grid_points, hourly_weather_lookup, hourly_marine
     weather_mats = {'wind_speed_10m': to_matrix(hourly_weather_lookup, 'wind_speed_10m'), 'wind_direction_10m': to_matrix(hourly_weather_lookup, 'wind_direction_10m'), 'precipitation': to_matrix(hourly_weather_lookup, 'precipitation'), 'visibility': to_matrix(hourly_weather_lookup, 'visibility')}
     marine_mats = {'wave_height': to_matrix(hourly_marine_lookup, 'wave_height'), 'wave_direction': to_matrix(hourly_marine_lookup, 'wave_direction'), 'ocean_current_velocity': to_matrix(hourly_marine_lookup, 'ocean_current_velocity'), 'ocean_current_direction': to_matrix(hourly_marine_lookup, 'ocean_current_direction')}
     return (weather_mats, marine_mats)
-
 async def get_or_build_weather_context(subgraph, forecast_hours):
     cache_key = _weather_cube_cache_key(subgraph, forecast_hours)
     if cache_key and cache_key in WEATHER_CUBE_CACHE:
@@ -370,7 +349,6 @@ async def get_or_build_weather_context(subgraph, forecast_hours):
         WEATHER_CUBE_CACHE[cache_key] = context
         _prune_cache_entries(WEATHER_CUBE_CACHE, WEATHER_CACHE_MAX_ENTRIES)
     return context
-
 def interpolate_weather_from_context(weather_context, lat, lon, hour):
     if not weather_context or len(weather_context.get('grid_points', [])) == 0:
         return ({'current': {}}, {'current': {}})
@@ -394,7 +372,6 @@ def interpolate_weather_from_context(weather_context, lat, lon, hour):
     nearest_idx = np.argpartition(dist2, k - 1)[:k]
     nearest_dist = np.sqrt(np.maximum(dist2[nearest_idx], 1e-12))
     weights = 1.0 / np.maximum(nearest_dist, 1e-06) ** 2
-
     def weighted_value(matrix):
         values = matrix[nearest_idx, hour_idx]
         valid = np.isfinite(values)
@@ -426,10 +403,8 @@ def interpolate_weather_from_context(weather_context, lat, lon, hour):
     if len(interp_cache) > 120000:
         interp_cache.clear()
     return payload
-
 _CW_ZERO_INVALID = {'wind_speed_10m', 'visibility'}
 _CM_ZERO_INVALID = {'wave_height'}
-
 def _field_needs_patch(field_name: str, value, zero_invalid_fields: set[str]) -> bool:
     if value is None:
         return True
@@ -440,7 +415,6 @@ def _field_needs_patch(field_name: str, value, zero_invalid_fields: set[str]) ->
     if not np.isfinite(v):
         return True
     return field_name in zero_invalid_fields and v == 0.0
-
 def _missing_field_names(cw_fields: dict, cm_fields: dict) -> tuple[list[str], list[str]]:
     weather_missing = []
     marine_missing = []
@@ -451,10 +425,7 @@ def _missing_field_names(cw_fields: dict, cm_fields: dict) -> tuple[list[str], l
         if _field_needs_patch(f, cm_fields.get(f), _CM_ZERO_INVALID):
             marine_missing.append(f)
     return (weather_missing, marine_missing)
-
-
 def _patch_with_fallback(cw_fields: dict, cm_fields: dict, fb_cw: dict, fb_cm: dict) -> tuple[dict, dict]:
-
     def _is_usable(val) -> bool:
         if val is None:
             return False
@@ -483,7 +454,6 @@ def _patch_with_fallback(cw_fields: dict, cm_fields: dict, fb_cw: dict, fb_cm: d
             else:
                 logger.warning('patch field=%s  old=%s  fallback=%s unusable (NaN/None) — keeping original', f, v, fb_val)
     return (cw, cm)
-
 def _batch_openmeteo_fallback_grouped(weather_locations: list[tuple[float, float]], marine_locations: list[tuple[float, float]], batch_size: int=OPEN_METEO_BATCH_SIZE) -> tuple[dict[tuple[float, float], dict], dict[tuple[float, float], dict]]:
     weather_locations = list(dict.fromkeys(weather_locations))
     marine_locations = list(dict.fromkeys(marine_locations))
@@ -540,7 +510,6 @@ def _batch_openmeteo_fallback_grouped(weather_locations: list[tuple[float, float
                 marine_fallback_map[loc] = slot
                 logger.info('open-meteo marine fallback  lat=%.3f lon=%.3f  wave_height=%s wave_dir=%s curr_vel=%s curr_dir=%s', loc[0], loc[1], slot.get('wave_height'), slot.get('wave_direction'), slot.get('ocean_current_velocity'), slot.get('ocean_current_direction'))
     return (weather_fallback_map, marine_fallback_map)
-
 def build_weather_info_from_context(path_latlon, weather_context):
     weather_info_list = []
     if not path_latlon:
@@ -594,7 +563,6 @@ def build_weather_info_from_context(path_latlon, weather_context):
         if filled:
             logger.info('route-avg fill  field=%s  avg=%.3f  filled=%d/%d points', field, avg, filled, len(weather_info_list))
     return weather_info_list
-
 def _adaptive_edge_sample_count(u_node, v_node):
     if not ADAPTIVE_EDGE_SAMPLING_ENABLED:
         return max(2, int(EDGE_WEATHER_SAMPLES))
@@ -606,7 +574,6 @@ def _adaptive_edge_sample_count(u_node, v_node):
     if edge_km <= 180.0:
         return 4
     return 5
-
 def interpolate_edge_samples(u_node, v_node, sample_count):
     sample_count = max(2, int(sample_count))
     u_lat, u_lon = (float(u_node[1]), float(u_node[0]))
@@ -618,9 +585,7 @@ def interpolate_edge_samples(u_node, v_node, sample_count):
         lon = u_lon + t * (v_lon - u_lon)
         points.append(_quantize_location(lat, lon))
     return points
-
 ROUTING_BASE_SPEED_KMH = 14.0 * 1.852
-
 async def batch_fetch_weather_forecast(locations, forecast_hours=72, batch_size=50):
     hourly_weather: dict = {}
     hourly_marine: dict = {}
@@ -669,22 +634,17 @@ async def batch_fetch_weather_forecast(locations, forecast_hours=72, batch_size=
     total_elapsed = time.perf_counter() - start_ts
     logger.info('[weather-forecast] completed points=%s hours=%s batches=%s total_elapsed=%.1fs severity_pts=%s', len(unique_locations), forecast_hours, total_batches, total_elapsed, len(streaming_severity))
     return (hourly_weather, hourly_marine, streaming_severity)
-
-
-
 def _is_valid_number(value):
     try:
         f = float(value)
         return np.isfinite(f)
     except (TypeError, ValueError):
         return False
-
 def _circular_mean_degrees(values):
     radians_list = [np.radians(v) for v in values]
     sin_mean = np.mean(np.sin(radians_list))
     cos_mean = np.mean(np.cos(radians_list))
     return (np.degrees(np.arctan2(sin_mean, cos_mean)) + 360.0) % 360.0
-
 def _nearest_locations_with_field(target_loc, candidates, field_name, field_type):
     scored = []
     for loc, payload in candidates:
@@ -701,7 +661,6 @@ def _nearest_locations_with_field(target_loc, candidates, field_name, field_type
     if field_type == 'angle':
         return _circular_mean_degrees(top)
     return float(np.mean(top))
-
 def impute_missing_weather_from_neighbors(locations, weather_results, marine_results):
     weather_fields = [('wind_speed_10m', 'scalar'), ('wind_direction_10m', 'angle')]
     marine_fields = [('wave_height', 'scalar'), ('wave_direction', 'angle'), ('ocean_current_velocity', 'scalar'), ('ocean_current_direction', 'angle')]
@@ -723,8 +682,6 @@ def impute_missing_weather_from_neighbors(locations, weather_results, marine_res
                 if imputed is not None:
                     marine_results[loc]['current'][field_name] = imputed
     return (weather_results, marine_results)
-
-
 def summarize_route_metrics(label, path_km, weather_points):
     wave_values = []
     wind_values = []
@@ -757,12 +714,10 @@ def summarize_route_metrics(label, path_km, weather_points):
     else:
         risk_score = 50.0
     return {'label': label, 'distance_km': round(path_km, 3), 'avg_wave_m': avg_wave, 'max_wave_m': max_wave, 'avg_wind_kmh': avg_wind, 'avg_precipitation_mm': avg_precip, 'avg_visibility_m': avg_vis, 'risk_score': risk_score, 'weather_coverage_pct': round(coverage * 100.0, 2)}
-
 def compute_point_risk_score(current_weather, current_marine):
     cw = current_weather.get('current', {})
     cm = current_marine.get('current', {})
     return round(compute_safety_risk(cw, cm) * 100.0, 2)
-
 def build_severity_points_from_lookups(locations, weather_lookup, marine_lookup, max_points=1500):
     severity_points = []
     for loc in locations[:max_points]:
@@ -772,7 +727,6 @@ def build_severity_points_from_lookups(locations, weather_lookup, marine_lookup,
         risk = compute_point_risk_score(current_weather, current_marine)
         severity_points.append({'coordinate': [lat, lon], 'risk': risk})
     return severity_points
-
 def _speed_dir_to_uv(speed, direction_deg):
     if speed is None or direction_deg is None:
         return (None, None)
@@ -780,7 +734,6 @@ def _speed_dir_to_uv(speed, direction_deg):
     u = float(speed) * float(np.sin(rad))
     v = float(speed) * float(np.cos(rad))
     return (u, v)
-
 def _idw_at_point(sample_x, sample_y, sample_vals, x, y, k=8, power=2):
     if len(sample_vals) == 0:
         return 0.0
@@ -795,7 +748,6 @@ def _idw_at_point(sample_x, sample_y, sample_vals, x, y, k=8, power=2):
     d = np.maximum(dist[idx], 1e-06)
     weights = 1.0 / d ** power
     return float(np.sum(weights * sample_vals[idx]) / np.sum(weights))
-
 def build_vector_grid_from_lookups(locations, weather_lookup, marine_lookup, grid_rows=64, grid_cols=64):
     points_lon = []
     points_lat = []
@@ -845,8 +797,6 @@ def build_vector_grid_from_lookups(locations, weather_lookup, marine_lookup, gri
             out_cu[r, c] = _idw_at_point(sx, sy, scu, lon, lat, k=8)
             out_cv[r, c] = _idw_at_point(sx, sy, scv, lon, lat, k=8)
     return {'bounds': {'min_lon': round(min_lon, 6), 'max_lon': round(max_lon, 6), 'min_lat': round(min_lat, 6), 'max_lat': round(max_lat, 6)}, 'rows': grid_rows, 'cols': grid_cols, 'wind_u': out_wu.ravel().tolist(), 'wind_v': out_wv.ravel().tolist(), 'current_u': out_cu.ravel().tolist(), 'current_v': out_cv.ravel().tolist()}
-
-
 def build_severity_grid_payload(severity_points, rows=SEVERITY_GRID_ROWS, cols=SEVERITY_GRID_COLS):
     if not severity_points:
         return None
@@ -885,7 +835,6 @@ def build_severity_grid_payload(severity_points, rows=SEVERITY_GRID_ROWS, cols=S
     grid = np.clip(grid, 0.0, 100.0)
     grid = np.round(grid.astype(np.float32), 2)
     return {'bounds': {'min_lon': round(min_lon, 6), 'max_lon': round(max_lon, 6), 'min_lat': round(min_lat, 6), 'max_lat': round(max_lat, 6)}, 'rows': grid_rows, 'cols': grid_cols, 'values': grid.ravel().tolist()}
-
 def _to_float_or_none(value):
     try:
         number = float(value)
@@ -894,7 +843,6 @@ def _to_float_or_none(value):
     except (TypeError, ValueError):
         return None
     return None
-
 def _bearing_from_latlon(point_a, point_b):
     lat1, lon1 = map(radians, point_a)
     lat2, lon2 = map(radians, point_b)
@@ -902,7 +850,6 @@ def _bearing_from_latlon(point_a, point_b):
     x = sin(dlon) * cos(lat2)
     y = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dlon)
     return (np.degrees(atan2(x, y)) + 360.0) % 360.0
-
 def estimate_route_fuel_proxy(path_latlon, weather_info):
     if len(path_latlon) < 2:
         return 0.0
@@ -936,7 +883,6 @@ def estimate_route_fuel_proxy(path_latlon, weather_info):
         bounded_penalty = min(max(float(weather_penalty), 0.0), 2.0)
         total_fuel_proxy += segment_km * (1.0 + 0.35 * bounded_penalty)
     return round(total_fuel_proxy, 3)
-
 def build_mode_explanation(mode, profile, astar_metrics, optimized_metrics, fuel_saved, fuel_saved_percent, edge_diagnostics=None):
     reasons = []
     risk_a = astar_metrics.get('risk_score')
@@ -948,7 +894,6 @@ def build_mode_explanation(mode, profile, astar_metrics, optimized_metrics, fuel
     reasons.append(f'fuel_proxy_saved={fuel_saved}')
     focus = {'safety': 'Prioritizes lower weather risk (wind/wave/current + direction alignment).', 'distance': 'Prioritizes shortest baseline route (A*).', 'fuel consumption': 'Prioritizes lower directional weather resistance to reduce fuel burn.', 'balanced': 'Minimizes voyage economics (time charter + fuel) with risk penalty only above a safety band.'}.get(mode, 'Balanced objective.')
     return {'mode': mode, 'focus': focus, 'weights': profile, 'vessel_limits': {'max_safe_wave_height_m': MAX_SAFE_WAVE_HEIGHT_M, 'max_safe_wind_kmh': MAX_SAFE_WIND_KMH, 'max_safe_current_kmh': MAX_SAFE_CURRENT_KMH}, 'factors_considered': ['edge_distance', 'edge_time_hours', 'fuel_tonnes', 'wind_speed_direction', 'wave_height_direction', 'ocean_current_velocity_direction'], 'edge_diagnostics': edge_diagnostics or {}, 'why_optimized': reasons, 'fuel_saved_proxy': fuel_saved, 'fuel_saved_proxy_percent': fuel_saved_percent}
-
 def sanitize_for_json(value):
     if isinstance(value, np.ndarray):
         flat = value.flatten().tolist()
@@ -971,7 +916,6 @@ def sanitize_for_json(value):
     if isinstance(value, (int, str, bool)) or value is None:
         return value
     return str(value)
-
 def is_no_go_weather(current_weather, current_marine):
     wind_speed = _to_float_or_none(current_weather.get('current', {}).get('wind_speed_10m'))
     wave_height = _to_float_or_none(current_marine.get('current', {}).get('wave_height'))
@@ -983,13 +927,10 @@ def is_no_go_weather(current_weather, current_marine):
     if current_vel is not None and current_vel > MAX_SAFE_CURRENT_KMH:
         return True
     return False
-
 def is_missing_weather(current_weather, current_marine):
     wind_speed = _to_float_or_none(current_weather.get('current', {}).get('wind_speed_10m'))
     wave_height = _to_float_or_none(current_marine.get('current', {}).get('wave_height'))
     return wind_speed is None or wave_height is None
-
-
 def aggregate_edge_weather(sample_payloads, bearing):
     penalties = []
     has_missing = False
@@ -1008,7 +949,6 @@ def aggregate_edge_weather(sample_payloads, bearing):
     max_penalty = float(np.max(penalties))
     aggregated_penalty = 0.35 * mean_penalty + 0.65 * max_penalty
     return (aggregated_penalty, has_missing, no_go_detected)
-
 def compute_path_cost(graph, path, weight_key='weight'):
     if not path or len(path) < 2:
         return 0.0
@@ -1025,7 +965,6 @@ def compute_path_cost(graph, path, weight_key='weight'):
         except (TypeError, ValueError):
             total += 0.0
     return round(total, 6)
-
 def _edge_weight_value(graph, u, v, weight_key='weight'):
     edge_data = graph.get_edge_data(u, v, default={})
     value = edge_data.get(weight_key)
@@ -1035,13 +974,11 @@ def _edge_weight_value(graph, u, v, weight_key='weight'):
         return float(value)
     except (TypeError, ValueError):
         return 0.0
-
 def _turn_angle_between_edges(prev_node, curr_node, next_node):
     b1 = _calculate_geographic_bearing(prev_node, curr_node)
     b2 = _calculate_geographic_bearing(curr_node, next_node)
     delta = abs(b2 - b1) % 360.0
     return min(delta, 360.0 - delta)
-
 def find_turn_aware_path(graph, start_node, end_node, edge_weight_key='weight', turn_penalty=0.0, max_turn_deg=MAX_ROUTE_TURN_DEG):
     if start_node == end_node:
         return [start_node]
@@ -1049,11 +986,9 @@ def find_turn_aware_path(graph, start_node, end_node, edge_weight_key='weight', 
         return None
     max_turn = float(max_turn_deg)
     turn_pen = max(0.0, float(turn_penalty))
-    
     def get_h(node):
         dist_nm = haversine_distance(node, end_node)
         return dist_nm / max(BASE_SPEED_KNOTS, 1.0) * TIME_CHARTER_RATE_PER_HOUR
-
     frontier = []
     best_g = {}
     parent = {}
@@ -1098,7 +1033,6 @@ def find_turn_aware_path(graph, start_node, end_node, edge_weight_key='weight', 
         reversed_path.append(cursor[0])
         cursor = parent.get(cursor)
     return list(reversed(reversed_path))
-
 def _catmull_rom_spline(P0, P1, P2, P3, num_points):
     alpha = 0.5
     def get_t(t, p0, p1):
@@ -1117,7 +1051,6 @@ def _catmull_rom_spline(P0, P1, P2, P3, num_points):
     B2 = (t3 - t) / (t3 - t1) * A2 + (t - t1) / (t3 - t1) * A3
     C = (t2 - t) / (t2 - t1) * B1 + (t - t1) / (t2 - t1) * B2
     return C.tolist()
-
 def constrained_smooth_path(path, points_per_edge=CONSTRAINED_SMOOTH_POINTS_PER_EDGE, max_points=CONSTRAINED_SMOOTH_MAX_POINTS):
     if not path or len(path) < 2:
         return list(path or [])
@@ -1132,7 +1065,6 @@ def constrained_smooth_path(path, points_per_edge=CONSTRAINED_SMOOTH_POINTS_PER_
                 lat = float(u[1]) + t * (float(v[1]) - float(u[1]))
                 dense.append((lon, lat))
         return dense[:max_points]
-    
     dense = [path[0]]
     ext_path = [path[0]] + list(path) + [path[-1]]
     step_points = max(2, int(points_per_edge))
@@ -1140,7 +1072,6 @@ def constrained_smooth_path(path, points_per_edge=CONSTRAINED_SMOOTH_POINTS_PER_
         P0, P1, P2, P3 = ext_path[i-1], ext_path[i], ext_path[i+1], ext_path[i+2]
         pts = _catmull_rom_spline(P0, P1, P2, P3, step_points + 1)
         dense.extend([(p[0], p[1]) for p in pts[1:]])
-    
     if len(dense) <= max_points:
         return dense
     stride = max(1, len(dense) // max_points)
@@ -1148,7 +1079,6 @@ def constrained_smooth_path(path, points_per_edge=CONSTRAINED_SMOOTH_POINTS_PER_
     if reduced[-1] != dense[-1]:
         reduced.append(dense[-1])
     return reduced
-
 def _interpolate_latlon_segment(start_latlon, end_latlon, max_step_km=ENDPOINT_CONNECTOR_MAX_STEP_KM):
     s_lat, s_lon = (float(start_latlon[0]), float(start_latlon[1]))
     e_lat, e_lon = (float(end_latlon[0]), float(end_latlon[1]))
@@ -1163,7 +1093,6 @@ def _interpolate_latlon_segment(start_latlon, end_latlon, max_step_km=ENDPOINT_C
         lon = s_lon + t * (e_lon - s_lon)
         out.append((lat, lon))
     return out
-
 def attach_endpoint_connectors(path_latlon, start_latlon, end_latlon):
     if not path_latlon:
         return [start_latlon, end_latlon]
@@ -1186,7 +1115,6 @@ def attach_endpoint_connectors(path_latlon, start_latlon, end_latlon):
             continue
         deduped.append((lat, lon))
     return deduped
-
 def _path_distance_km(graph, path):
     if not path or len(path) < 2:
         return float('inf')
@@ -1200,7 +1128,6 @@ def _path_distance_km(graph, path):
         except (TypeError, ValueError):
             total += 0.0
     return total
-
 def select_best_start_end_nodes(graph, tree, start_coord, end_coord, heuristic_fn):
     k = max(1, int(ENDPOINT_SNAP_TOP_K))
     start_candidates = find_k_nearest_water_nodes(graph, start_coord, tree, k=k)
@@ -1227,7 +1154,6 @@ def select_best_start_end_nodes(graph, tree, start_coord, end_coord, heuristic_f
     if best_pair is not None:
         return (best_pair[0], best_pair[1], best_pair[2])
     return (start_candidates[0][0], end_candidates[0][0], None)
-
 def count_route_limit_violations(weather_points):
     violations = {'wave': 0, 'wind': 0, 'current': 0}
     for point in weather_points:
@@ -1242,7 +1168,6 @@ def count_route_limit_violations(weather_points):
             violations['current'] += 1
     violations['total'] = violations['wave'] + violations['wind'] + violations['current']
     return violations
-
 def compute_arrival_hours_from_path(path, graph):
     if not path:
         return {}
@@ -1261,7 +1186,6 @@ def compute_arrival_hours_from_path(path, graph):
         cumulative += max(float(segment_hours), 0.0)
         hours[v] = cumulative
     return hours
-
 def optimize_path_with_iterative_refinement(subgraph, start_node, end_node, objective_profile, selected_mode, total_distance_km, weather_context, initial_arrival_hours, initial_path, max_iter=OPTIMIZATION_MAX_ITER, convergence_threshold=OPTIMIZATION_CONVERGENCE_THRESHOLD):
     current_arrival_hours = dict(initial_arrival_hours or {})
     current_path = list(initial_path) if initial_path else []
@@ -1320,7 +1244,6 @@ def optimize_path_with_iterative_refinement(subgraph, start_node, end_node, obje
     total_gain = initial_path_cost - best_cost if initial_path and 'initial_path_cost' in locals() else 0.0
     logger.info('[iter-opt] best mode=%s final_cost=%.2f total_economic_gain=%.2f', selected_mode, best_cost, total_gain)
     return {'path': best_path if best_path else list(initial_path), 'graph': best_subgraph, 'edge_diagnostics': best_edge_diagnostics, 'severity_points': best_severity_points, 'weather_context': best_weather_context, 'cost': best_cost, 'arrival_hours': best_arrival_hours}
-
 def update_subgraph_weights(subgraph, start_node, end_node, profile, selected_mode, total_distance_km=None, weather_context=None, arrival_hours=None):
     edge_samples = {}
     bearings = {}
@@ -1360,29 +1283,21 @@ def update_subgraph_weights(subgraph, start_node, end_node, profile, selected_mo
                 sample_payloads.append((current_weather, current_marine))
             weather_penalty, has_missing, no_go_detected = aggregate_edge_weather(sample_payloads, bearing)
             if no_go_detected:
-                # Proportional "no-go" penalty instead of hard infinity block.
-                # A 50x multiplier makes these edges very unattractive but still
-                # allows the cost function to properly compare a short rough-weather
-                # transit vs a massive detour. True hard blocks (1e9) are reserved
-                # for impassable conditions like hurricanes or ice.
                 NO_GO_MULTIPLIER = 50.0
                 base_cost = distance_nm * (FUEL_RATE_AT_REF_SPEED_TONNES_PER_NM * FUEL_PRICE_PER_TONNE + TIME_CHARTER_RATE_PER_HOUR / max(BASE_SPEED_KNOTS, 1.0))
                 data['weight'] = base_cost * NO_GO_MULTIPLIER
                 edge_diagnostics['no_go_edges_blocked'] += 1
                 continue
             if selected_mode == 'safety' and SAFETY_BLOCK_ON_MISSING_WEATHER and has_missing:
-                # Use the same proportional penalty instead of hard infinity
                 NO_GO_MULTIPLIER = 50.0
                 base_cost = distance_nm * (FUEL_RATE_AT_REF_SPEED_TONNES_PER_NM * FUEL_PRICE_PER_TONNE + TIME_CHARTER_RATE_PER_HOUR / max(BASE_SPEED_KNOTS, 1.0))
                 data['weight'] = base_cost * NO_GO_MULTIPLIER
                 edge_diagnostics['missing_weather_edges_blocked'] += 1
                 continue
-            # Collect weather variables for averaging across the edge
             waves_h, waves_d = [], []
             winds_s, winds_d = [], []
             currs_v, currs_d = [], []
             risk_scores = []
-            
             for cw_pkg, cm_pkg in sample_payloads:
                 cw = cw_pkg.get('current', {})
                 cm = cm_pkg.get('current', {})
@@ -1390,20 +1305,15 @@ def update_subgraph_weights(subgraph, start_node, end_node, profile, selected_mo
                 wd = _to_float_or_none(cm.get('wave_direction'))
                 if wh is not None: waves_h.append(wh)
                 if wd is not None: waves_d.append(wd)
-                
                 ws = _to_float_or_none(cw.get('wind_speed_10m'))
                 wdir = _to_float_or_none(cw.get('wind_direction_10m'))
                 if ws is not None: winds_s.append(ws)
                 if wdir is not None: winds_d.append(wdir)
-                
                 cv = _to_float_or_none(cm.get('ocean_current_velocity'))
                 cd = _to_float_or_none(cm.get('ocean_current_direction'))
                 if cv is not None: currs_v.append(cv)
                 if cd is not None: currs_d.append(cd)
-                
                 risk_scores.append(compute_safety_risk(cw, cm))
-
-            # Average environmental conditions along the edge
             avg_wh = float(np.mean(waves_h)) if waves_h else 0.0
             avg_wd = float(np.mean(waves_d)) if waves_d else 0.0
             avg_ws = float(np.mean(winds_s)) if winds_s else 0.0
@@ -1411,14 +1321,10 @@ def update_subgraph_weights(subgraph, start_node, end_node, profile, selected_mo
             avg_cv = float(np.mean(currs_v)) if currs_v else 0.0
             avg_cd = float(np.mean(currs_d)) if currs_d else 0.0
             edge_risk = float(np.max(risk_scores)) if risk_scores else 0.0
-
-            # UNIFIED Performance Call (Caps both Time and Fuel surge at 2.5x)
             from vessel_polar import compute_vessel_performance
             perf = compute_vessel_performance(distance_nm, avg_wh, avg_wd, avg_ws, avg_wdir, avg_cv, avg_cd, bearing)
-            
             time_hours = perf['time_hours']
             fuel_tonnes = perf['fuel_tonnes']
-            
             time_cost_usd = time_hours * TIME_CHARTER_RATE_PER_HOUR
             fuel_cost_usd = fuel_tonnes * FUEL_PRICE_PER_TONNE
             risk_excess = max(edge_risk - RISK_FREE_BAND, 0.0)
@@ -1443,13 +1349,11 @@ def update_subgraph_weights(subgraph, start_node, end_node, profile, selected_mo
             data['weight'] = data.get('original_weight', data.get('weight', 1.0))
             data['time_hours'] = data.get('time_hours', 1.0)
     return (subgraph, edge_diagnostics, severity_points, weather_context)
-
 def compute_wind_components(wind_speed, wind_direction):
     rad = math.radians(wind_direction)
     u = -wind_speed * math.sin(rad)
     v = -wind_speed * math.cos(rad)
     return (u, v)
-
 def create_wind_grid(locations, weather_lookup, bbox_padding_deg=0.5, grid_res=0.05):
     if not locations:
         return (None, None, None, None, [], [], [], [])
@@ -1489,8 +1393,6 @@ def create_wind_grid(locations, weather_lookup, bbox_padding_deg=0.5, grid_res=0
     grid_u = griddata(points_arr, u_arr, (grid_lon_2d, grid_lat_2d), method=method, fill_value=np.nan)
     grid_v = griddata(points_arr, v_arr, (grid_lon_2d, grid_lat_2d), method=method, fill_value=np.nan)
     return (min_lon, max_lon, min_lat, max_lat, grid_lons.tolist(), grid_lats.tolist(), grid_u.tolist(), grid_v.tolist())
-
-
 async def handle_navigation(websocket):
     request_id = str(uuid.uuid4())[:8]
     try:
@@ -1511,12 +1413,9 @@ async def handle_navigation(websocket):
             logger.info('request_id=%s cache=route-hit mode=%s model_run=%s', request_id, selected_mode, route_cache_key[-1])
             await websocket.send(json.dumps(cached_route['payload'], allow_nan=False))
             return
-
         t_start_nav = time.perf_counter()
-
         async def _progress(pct, step):
             await websocket.send(json.dumps({'type': 'progress', 'pct': pct, 'step': step}))
-
         async def _await_blocking_with_progress(blocking_fn, start_pct, max_pct, step_messages, tick_seconds=1.5, pct_step=1):
             pct = int(start_pct)
             msg_idx = 0
@@ -1530,7 +1429,6 @@ async def handle_navigation(websocket):
                     msg = step_messages[msg_idx % len(step_messages)] if step_messages else 'Working...'
                     await _progress(pct, msg)
                     msg_idx += 1
-
         def _gc_heuristic_km(u, v):
             from math import radians, sin, cos, atan2, sqrt
             lon1, lat1 = (float(u[0]), float(u[1]))
@@ -1544,7 +1442,6 @@ async def handle_navigation(websocket):
         start_node, end_node, seed_path = await _await_blocking_with_progress(lambda: select_best_start_end_nodes(GLOBAL_GRAPH, GLOBAL_TREE, start, end, heuristic_fn=_gc_heuristic_km), start_pct=4, max_pct=9, step_messages=['Evaluating nearest water-node candidates...', 'Testing start/end snap combinations...', 'Selecting best endpoint pair...'])
         logger.info('request_id=%s endpoint_snap=%.2fs', request_id, time.perf_counter() - t0)
         logger.info('request_id=%s endpoint_snap k=%s start_node=%s end_node=%s seed_path_nodes=%s', request_id, ENDPOINT_SNAP_TOP_K, start_node, end_node, len(seed_path) if seed_path else 0)
-
         def _geodesic_baseline(start, end, n_waypoints=12):
             from math import radians, degrees, sin, cos, atan2, sqrt
             lon1, lat1 = (radians(float(start[0])), radians(float(start[1])))
@@ -1631,7 +1528,6 @@ async def handle_navigation(websocket):
         t0 = time.perf_counter()
         forecast_hours = 72
         import asyncio as _asyncio
-
         async def _weather_heartbeat(stop_event):
             pct = 42
             steps = ['Downloading GFS wind & wave forecast…', 'Fetching CMEMS ocean current data…', 'Building weather corridor grid…', 'Interpolating weather to route nodes…', 'Analysing severe weather cells…']
@@ -1714,9 +1610,6 @@ async def handle_navigation(websocket):
         astar_metrics['fuel_proxy'] = astar_fuel_proxy
         opt_eta_h = calculate_eta_hours(new_smooth_path, weather_info_list)
         astar_eta_h = calculate_eta_hours(new_astar, astar_weather_info)
-
-        # FORCE: Always use the verified polar model for the final summary. 
-        # Don't trust graph edge attributes which might be stale or pre-calculated with old logic.
         opt_polar = calculate_fuel_and_co2(new_smooth_path, weather_info_list)
         astar_polar = calculate_fuel_and_co2(new_astar, astar_weather_info)
         opt_fuel_t = opt_polar['fuel_tonnes']
@@ -1774,18 +1667,11 @@ async def handle_navigation(websocket):
                 proof['acceptance_reason'] = 'balanced_commercial_guard'
                 proof['objective_score_optimized'] = optimized_objective_score
                 proof['objective_improvement_pct'] = 0.0
-            # Strict Pareto Guard: If risk is same/worse, or gain is negligible, and distance is worse, reject.
             dist_increase_pct = (optimized_metrics['distance_km'] - astar_metrics['distance_km']) / astar_metrics['distance_km'] * 100.0 if astar_metrics['distance_km'] else 0.0
             risk_gain_pts = round(astar_metrics.get('risk_score', 0.0) - optimized_metrics.get('risk_score', 0.0), 2)
-            
-            # Case 1: Safety is strictly same or worse
             safety_not_improved = risk_gain_pts <= 0.05
-            
-            # Case 2: We added distance but the risk benefit is tiny (< 1.0 point)
             marginal_safety_tradeoff = dist_increase_pct > 0.1 and risk_gain_pts < 1.0
-            
             extreme_deviation = dist_increase_pct > 15.0 and risk_gain_pts < 5.0
-            
             if safety_not_improved or marginal_safety_tradeoff or extreme_deviation:
                 logger.info('request_id=%s safety_guard fallback=astar reason=%s', request_id, 'insufficient_gain' if extreme_deviation else 'no_improvement')
                 optimized_path = a_star_path
@@ -1823,7 +1709,6 @@ async def handle_navigation(websocket):
                 pareto_weather = build_weather_info_from_context(pareto_path_latlon, weather_context)
                 pareto_routes.append({'label': label, 'path': pareto_path_latlon, 'distance_km': round(calculate_total_nautical_distance(pareto_path_latlon) * 1.852, 3), 'objective_score': compute_path_cost(pareto_result['graph'], pareto_path_nodes, weight_key='weight'), 'metrics': summarize_route_metrics(label, calculate_total_nautical_distance(pareto_path_latlon) * 1.852, pareto_weather)})
         mode_explanation = build_mode_explanation(selected_mode, objective_profile, astar_metrics, optimized_metrics, fuel_saved, fuel_saved_percent, edge_diagnostics=edge_diagnostics)
-
         def _bg_excel():
             try:
                 export_weather_to_excel(grid_points, current_weather_lookup, current_marine_lookup)
@@ -1845,7 +1730,6 @@ async def handle_navigation(websocket):
         error_payload = sanitize_for_json({'type': 'error', 'message': str(e)})
         await websocket.send(json.dumps(error_payload, allow_nan=False))
         raise
-
 def export_weather_to_excel(grid_points, current_weather_lookup, current_marine_lookup, output_path=None):
     try:
         import openpyxl
@@ -1868,7 +1752,6 @@ def export_weather_to_excel(grid_points, current_weather_lookup, current_marine_
         cell.fill = header_fill
         cell.alignment = Alignment(horizontal='center', wrap_text=True)
         ws.column_dimensions[get_column_letter(col_idx)].width = 18
-
     def _risk_fill(score):
         s = max(0.0, min(score / 100.0, 1.0))
         if s < 0.33:
@@ -1919,7 +1802,6 @@ def export_weather_to_excel(grid_points, current_weather_lookup, current_marine_
     wb.save(output_path)
     logger.info('[excel] Weather analysis saved path=%s rows=%s', output_path, len(grid_points))
     return output_path
-
 def init_globals():
     logger.info('WebSocket server is starting on ws://localhost:5000')
     global GLOBAL_GRAPH, GLOBAL_TREE, GLOBAL_NODE_ARRAY

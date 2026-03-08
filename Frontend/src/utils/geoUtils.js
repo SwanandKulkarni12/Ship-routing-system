@@ -5,7 +5,7 @@ const WATER_TYPES = new Set([
 export async function isWaterCoordinate(lat, lon) {
   try {
     const resp = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
+      `https:
       { headers: { 'Accept-Language': 'en' } },
     );
     const data = await resp.json();
@@ -13,10 +13,9 @@ export async function isWaterCoordinate(lat, lon) {
     const type = (data.type || '').toLowerCase();
     return WATER_TYPES.has(type);
   } catch {
-    return true; // fail open — don't block the user if Nominatim is down
+    return true; 
   }
 }
-
 function segmentDist(a, b) {
   const toRad = d => d * Math.PI / 180;
   const lat1 = toRad(a[0]), lat2 = toRad(b[0]);
@@ -72,4 +71,4 @@ export function routeBearingAt(coords, t) {
     if (cum[mid + 1] < target) lo = mid + 1; else hi = mid;
   }
   return bearingBetween(coords[lo], coords[lo + 1]);
-}
+}

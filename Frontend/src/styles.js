@@ -81,4 +81,4 @@ export const legendTicksStyle = {
   position: 'absolute', left: '56px', top: '27px',
   color: 'rgba(230,240,255,0.95)', fontSize: '10px', fontWeight: 600,
   pointerEvents: 'none',
-};
+};
