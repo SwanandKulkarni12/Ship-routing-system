@@ -12,27 +12,31 @@ function BannerPill({ icon, label, value, color }) {
     </div>
   );
 }
-export default function ResultBanner({ metrics }) {
+export default function ResultBanner({ metrics, reportUrl }) {
   if (!metrics?.optimized || !metrics?.astar) return null;
   const riskDelta   = metrics.astar.risk_score - metrics.optimized.risk_score;
   const fuelSaved   = metrics.fuel_tonnes_saved ?? 0;
   const etaSaved    = metrics.eta_hours_saved   ?? 0;
   const distSaved   = metrics.distance_saved_km ?? 0;
+  
   const fmtEta = (h) => {
     const abs = Math.abs(h);
     if (!abs || isNaN(abs)) return null;
     const d = Math.floor(abs / 24), hr = Math.round(abs % 24);
     return d > 0 ? `${d}d ${hr}h` : `${hr}h`;
   };
+
   const fmtEtaCell = (h) => {
     if (h == null || isNaN(h)) return '—';
     const d = Math.floor(Math.abs(h) / 24), hr = Math.round(Math.abs(h) % 24);
     return d > 0 ? `${d}d ${hr}h` : `${hr}h`;
   };
+
   const etaDisplayDiffers = fmtEtaCell(metrics.astar.eta_hours) !== fmtEtaCell(metrics.optimized.eta_hours);
   const distDisplayDiffers = Math.round(Math.abs(distSaved)) > 0;
   const riskDisplayDiffers = Math.abs(riskDelta) >= 0.05 &&
     Number(metrics.astar.risk_score).toFixed(1) !== Number(metrics.optimized.risk_score).toFixed(1);
+
   return (
     <div style={{
       position: 'absolute', bottom: 60, left: '50%', transform: 'translateX(-50%)',
@@ -63,6 +67,34 @@ export default function ResultBanner({ metrics }) {
       )}
       {distDisplayDiffers && distSaved < -0.5 && (
         <BannerPill icon="📏" label="Distance added"  value={`${Math.round(Math.abs(distSaved))} km`}    color="#ffaa40" />
+      )}
+
+      {reportUrl && (
+        <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center' }}>
+          <a 
+            href={`http://localhost:5000${reportUrl}`} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{
+              textDecoration: 'none',
+              background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+              color: '#000',
+              padding: '10px 24px',
+              borderRadius: 20,
+              fontWeight: 800,
+              fontSize: 13,
+              boxShadow: '0 4px 15px rgba(255, 215, 0, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              transition: 'transform 0.2s',
+            }}
+            onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'}
+            onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            <span>📄</span> DOWNLOAD AI VOYAGE PLAN
+          </a>
+        </div>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import logging
 import os
 import random
 import time
+import threading
 import uuid
 from datetime import datetime, timezone
 from math import atan2, cos, radians, sin, sqrt
@@ -13,7 +14,6 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'), override=False)
 import networkx as nx
 import numpy as np
-import websockets
 from scipy.interpolate import griddata
 from build_subgraph import build_subgraph
 from cost_calculation import calculate_weather_cost, compute_safety_risk
@@ -22,6 +22,7 @@ from gfs_api import gfs_available, fetch_gfs_atmospheric_grid, build_hourly_weat
 from graph_loader import build_spatial_index, find_k_nearest_water_nodes, find_nearest_water_node, load_navigation_graph
 from vessel_polar import BASE_SPEED_KNOTS, calculate_eta_hours, calculate_fuel_and_co2, get_speed_factor_polar
 from weather_api import OpenMeteoRateLimitError, fetch_weather_data_hourly, fetch_marine_data_hourly
+import voyage_analyzer
 weather_data = {}
 marine_data = {}
 R_NM = 3440.065
@@ -1398,7 +1399,7 @@ async def handle_navigation(websocket):
     try:
         if GLOBAL_GRAPH is None or GLOBAL_TREE is None or GLOBAL_NODE_ARRAY is None:
             raise RuntimeError('Navigation graph not initialized. Restart backend.')
-        message = await websocket.recv()
+        message = await websocket.receive_str()
         data = json.loads(message)
         start_coords = tuple(data['start'])
         end_coords = tuple(data['end'])
@@ -1411,11 +1412,11 @@ async def handle_navigation(websocket):
         if cached_route:
             cached_route['created_at'] = time.time()
             logger.info('request_id=%s cache=route-hit mode=%s model_run=%s', request_id, selected_mode, route_cache_key[-1])
-            await websocket.send(json.dumps(cached_route['payload'], allow_nan=False))
+            await websocket.send_str(json.dumps(cached_route['payload'], allow_nan=False))
             return
         t_start_nav = time.perf_counter()
         async def _progress(pct, step):
-            await websocket.send(json.dumps({'type': 'progress', 'pct': pct, 'step': step}))
+            await websocket.send_str(json.dumps({'type': 'progress', 'pct': pct, 'step': step}))
         async def _await_blocking_with_progress(blocking_fn, start_pct, max_pct, step_messages, tick_seconds=1.5, pct_step=1):
             pct = int(start_pct)
             msg_idx = 0
@@ -1492,7 +1493,7 @@ async def handle_navigation(websocket):
             ROUTE_RESPONSE_CACHE[route_cache_key] = {'created_at': time.time(), 'payload': safe_payload}
             _prune_cache_entries(ROUTE_RESPONSE_CACHE, ROUTE_CACHE_MAX_ENTRIES)
             logger.info('request_id=%s distance_mode_fast_return dist_km=%.1f', request_id, dist_km)
-            await websocket.send(json.dumps(safe_payload))
+            await websocket.send_str(json.dumps(safe_payload))
             return
         await _progress(20, 'Sizing route corridor from weather...')
         corridor_radius_km, corridor_meta = await choose_corridor_radius_km(a_star_path)
@@ -1546,7 +1547,12 @@ async def handle_navigation(websocket):
         finally:
             _stop_evt.set()
             await _hb_task
-        logger.info('request_id=%s weather_context_build=%.2fs grid_points=%s', request_id, time.perf_counter() - t0, len(weather_context.get('grid_points', [])))
+        threading.Thread(
+            target=export_weather_to_excel, 
+            args=(weather_context.get('grid_points', []), weather_context.get('current_weather_lookup', {}), weather_context.get('current_marine_lookup', {})),
+            daemon=True
+        ).start()
+        logger.info('request_id=%s weather_context_build=%.2fs grid_points=%s (Excel export started in background)', request_id, time.perf_counter() - t0, len(weather_context.get('grid_points', [])))
         await _progress(75, 'Running route optimisation…')
         optimized_subgraph = subgraph.copy()
         edge_diagnostics = {}
@@ -1709,13 +1715,27 @@ async def handle_navigation(websocket):
                 pareto_weather = build_weather_info_from_context(pareto_path_latlon, weather_context)
                 pareto_routes.append({'label': label, 'path': pareto_path_latlon, 'distance_km': round(calculate_total_nautical_distance(pareto_path_latlon) * 1.852, 3), 'objective_score': compute_path_cost(pareto_result['graph'], pareto_path_nodes, weight_key='weight'), 'metrics': summarize_route_metrics(label, calculate_total_nautical_distance(pareto_path_latlon) * 1.852, pareto_weather)})
         mode_explanation = build_mode_explanation(selected_mode, objective_profile, astar_metrics, optimized_metrics, fuel_saved, fuel_saved_percent, edge_diagnostics=edge_diagnostics)
-        def _bg_excel():
+        def _bg_llm_analysis(voyage_meta, pdf_path, loop_to_use):
             try:
-                export_weather_to_excel(grid_points, current_weather_lookup, current_marine_lookup)
+                xl_path = os.path.join(os.path.dirname(__file__), 'route_weather_analysis.xlsx')
+                # Wait briefly for Excel to finish if it's still writing
+                for _ in range(20):
+                    if os.path.exists(xl_path): break
+                    time.sleep(0.5)
+                
+                if os.path.exists(xl_path):
+                    voyage_analyzer.run_full_analysis(xl_path, voyage_meta, pdf_path)
+                    msg = json.dumps({'type': 'report_ready', 'report_url': f"/reports/{os.path.basename(pdf_path)}"})
+                    asyncio.run_coroutine_threadsafe(websocket.send_str(msg), loop_to_use)
             except Exception as exc:
-                logger.warning('request_id=%s excel_export_failed error=%s', request_id, exc)
-        import threading
-        threading.Thread(target=_bg_excel, daemon=True).start()
+                logger.warning('request_id=%s bg_analysis_failed error=%s', request_id, exc)
+
+        report_pdf_path = os.path.join(os.path.dirname(__file__), os.getenv('AI_REPORT_NAME', 'voyage_report.pdf'))
+        threading.Thread(
+            target=_bg_llm_analysis, 
+            args=(optimized_metrics, report_pdf_path, asyncio.get_event_loop()),
+            daemon=True
+        ).start()
         excel_path = None
         payload = {'type': 'final', 'request_id': request_id, 'path': new_smooth_path, 'weather': weather_info_list, 'optimized_weather': weather_info_list, 'astar_weather': astar_weather_info, 'severity': severity_points, 'severity_grid': severity_grid, 'wind_field': wind_field, 'wind_grid': wind_grid, 'distance': optimized_distance_km, 'apath': new_astar, 'mode': selected_mode, 'excel_export': excel_path, 'alternatives': pareto_routes, 'metrics': {'astar': astar_metrics, 'optimized': optimized_metrics, 'distance_saved_km': distance_saved, 'distance_saved_percent': percent_saved, 'fuel_saved_proxy': fuel_saved, 'fuel_saved_proxy_percent': fuel_saved_percent, 'fuel_tonnes_saved': fuel_tonnes_saved, 'co2_tonnes_saved': co2_tonnes_saved, 'eta_hours_saved': eta_hours_saved, 'proof': proof, 'mode_explanation': mode_explanation}}
         t0 = time.perf_counter()
@@ -1724,11 +1744,11 @@ async def handle_navigation(websocket):
         ROUTE_RESPONSE_CACHE[route_cache_key] = {'created_at': time.time(), 'payload': safe_payload}
         _prune_cache_entries(ROUTE_RESPONSE_CACHE, ROUTE_CACHE_MAX_ENTRIES)
         logger.info('request_id=%s sending_response path_points=%s astar_points=%s weather_points=%s alternatives=%s', request_id, len(new_smooth_path), len(new_astar), len(weather_info_list), len(pareto_routes))
-        await websocket.send(json.dumps(safe_payload, allow_nan=False))
+        await websocket.send_str(json.dumps(safe_payload, allow_nan=False))
     except Exception as e:
         logger.exception('request_id=%s handle_navigation error=%s', request_id, e)
         error_payload = sanitize_for_json({'type': 'error', 'message': str(e)})
-        await websocket.send(json.dumps(error_payload, allow_nan=False))
+        await websocket.send_str(json.dumps(error_payload, allow_nan=False))
         raise
 def export_weather_to_excel(grid_points, current_weather_lookup, current_marine_lookup, output_path=None):
     try:
