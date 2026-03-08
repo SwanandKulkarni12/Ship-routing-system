@@ -121,6 +121,7 @@ function App() {
     if (!mapContainerRef.current) return;
     const map = new MLMap({
       container: mapContainerRef.current,
+      preserveDrawingBuffer: true,
       style: {
         version: 8,
         glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
@@ -486,6 +487,26 @@ function App() {
         setStatus('Routes Calculated');
         setShowMetrics(true);
         setTimeout(() => setProgress({ pct: 0, step: '' }), 2000);
+        
+        // Capture map screenshot after routes render
+        setTimeout(() => {
+          const map = mapRef.current;
+          if (map) {
+            try {
+              const canvas = map.getCanvas();
+              const imageData = canvas.toDataURL('image/png');
+              fetch('http://localhost:5000/upload-screenshot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: imageData }),
+              }).then(r => r.json())
+                .then(d => console.log('📸 Map screenshot uploaded:', d))
+                .catch(e => console.warn('Screenshot upload failed:', e));
+            } catch (e) {
+              console.warn('Could not capture map:', e);
+            }
+          }
+        }, 2500);
       } else if (data.type === 'report_ready') {
         setReportUrl(data.report_url);
       } else if (data.type === 'excel_ready') {
