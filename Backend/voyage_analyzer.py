@@ -71,9 +71,9 @@ def analyze_voyage_with_llm(excel_path):
         
         # Aggregate data for context
         summary_stats = {
-            'wave_height': {'max': df['wave_height'].max(), 'avg': df['wave_height'].mean()},
-            'wind_speed': {'max': df['wind_speed'].max(), 'avg': df['wind_speed'].mean()},
-            'current': {'max': df['current_velocity'].max()},
+            'wave_height': {'max': df['Wave Height (m)'].max(), 'avg': df['Wave Height (m)'].mean()},
+            'wind_speed': {'max': df['Wind Speed (km/h)'].max(), 'avg': df['Wind Speed (km/h)'].mean()},
+            'current': {'max': df['Current Velocity (m/s)'].max()},
             'points': len(df)
         }
         
@@ -124,10 +124,10 @@ def run_full_analysis(excel_path, voyage_metadata, output_pdf):
     analysis_data = {
         'summary': voyage_metadata,
         'weather': {
-            'max_wave': df['wave_height'].max(),
-            'avg_wave': df['wave_height'].mean(),
-            'max_wind': df['wind_speed'].max(),
-            'dominant_wave_dir': df['wave_direction'].mode()[0] if not df['wave_direction'].empty else 0
+            'max_wave': df['Wave Height (m)'].max(),
+            'avg_wave': df['Wave Height (m)'].mean(),
+            'max_wind': df['Wind Speed (km/h)'].max(),
+            'dominant_wave_dir': df['Wave Direction (°)'].mode()[0] if not df['Wave Direction (°)'].empty else 0
         }
     }
     
